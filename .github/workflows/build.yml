@@ -13,7 +13,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        # ubuntu-22.04 plutôt que ubuntu-latest : on build avec une glibc
+        # plus ancienne pour rester compatible avec des machines volontaires
+        # qui n'ont pas forcément la toute dernière version d'Ubuntu/Debian.
+        # Un binaire lié à une glibc récente ne tourne PAS sur une glibc
+        # plus ancienne (incompatibilité à sens unique), donc on vise large.
+        os: [windows-latest, ubuntu-22.04]
 
     runs-on: ${{ matrix.os }}
 
@@ -54,27 +59,35 @@ jobs:
         run: pyinstaller publipostage.spec
 
       # Sur Windows le binaire s'appelle publipostage.exe, sur Linux publipostage.
-      # On renomme pour inclure l'OS dans le nom de fichier livré, pour
-      # que les deux binaires de la même release ne se marchent pas dessus.
-      - name: Renommer l'exécutable (Linux)
+      # On constitue un dossier "livraison" avec l'exe + son script de
+      # raccourci Bureau correspondant, puis on zippe le tout : le
+      # volontaire télécharge un seul fichier, l'extrait, lance le script
+      # une fois, et a son icône sur le Bureau.
+      - name: Préparer le paquet Linux
         if: runner.os == 'Linux'
         run: |
-          cd dist
-          mv publipostage publipostage-linux
+          mkdir -p package
+          cp dist/publipostage package/publipostage-linux
+          cp installer/creer_raccourci_linux.sh package/
+          chmod +x package/publipostage-linux package/creer_raccourci_linux.sh
+          cd package && zip -r ../publipostage-linux.zip .
 
-      - name: Renommer l'exécutable (Windows)
+      - name: Préparer le paquet Windows
         if: runner.os == 'Windows'
         run: |
-          cd dist
-          mv publipostage.exe publipostage-windows.exe
+          mkdir package
+          copy dist\publipostage.exe package\publipostage-windows.exe
+          copy installer\creer_raccourci_windows.ps1 package\
+          Compress-Archive -Path package\* -DestinationPath publipostage-windows.zip
+        shell: pwsh
 
-      - name: Publier l'exécutable comme artifact du build
+      - name: Publier le paquet comme artifact du build
         uses: actions/upload-artifact@v4
         with:
           name: publipostage-${{ runner.os }}
           path: |
-            dist/publipostage-linux
-            dist/publipostage-windows.exe
+            publipostage-linux.zip
+            publipostage-windows.zip
           if-no-files-found: ignore
 
   release:
@@ -88,12 +101,12 @@ jobs:
         with:
           path: artifacts
 
-      - name: Créer la release GitHub avec les deux binaires
+      - name: Créer la release GitHub avec les deux paquets
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/publipostage-Linux/publipostage-linux
-            artifacts/publipostage-Windows/publipostage-windows.exe
+            artifacts/publipostage-Linux/publipostage-linux.zip
+            artifacts/publipostage-Windows/publipostage-windows.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
