@@ -1,0 +1,7 @@
+flask
+pyyaml
+pandas
+python-docx
+python-dotenv
+jinja2
+platformdirs

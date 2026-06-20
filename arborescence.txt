@@ -1,0 +1,25 @@
+Publipostage_comptable/
+├── app.py
+├── requirements.txt
+├── .env                  ← à créer par toi (jamais commité), à partir de .env.example
+├── .env.example
+├── .gitignore
+├── config/
+│   └── config.yaml
+├── templates/             ← dossier réservé par Flask : les pages HTML de l'appli web
+│   └── index.html
+├── scripts/
+│   └── publipostage_stock_ed7.py
+└── data/
+    ├── input/
+    │   ├── csv/            ← tes fichiers CSV de bénéficiaires
+    │   ├── templates/       ← templates DOCUMENTS : fiche PS (.docx) + modèles email (.html)
+    │   └── uploads/         (réservé pour un futur upload navigateur, pas encore utilisé)
+    ├── output/
+    │   ├── docs/           ← fiches PS générées (.docx)
+    │   └── pdfs/           ← fiches PS générées (.pdf)
+    ├── logs/               ← un fichier de log par campagne lancée
+    └── campagnes.db        ← base SQLite, historique des campagnes
+
+
+app.py crée tous ces sous-dossiers automatiquement au démarrage s'ils n'existent pas. Il te suffit d'y déposer tes vrais CSV et templates.

@@ -1,0 +1,75 @@
+# =============================================
+# Configuration de l'outil de publipostage
+# =============================================
+
+# --------------------------------------------
+# Répertoires principaux (chemins relatifs à la racine du projet,
+# c'est-à-dire au dossier qui contient app.py)
+# --------------------------------------------
+paths:
+  data_dir: "data"
+  input_dir: "data/input"
+  csv_dir: "data/input/csv"
+
+  # Templates de DOCUMENTS (fiche PS .docx + modèles d'email .html).
+  # ⚠️ Ne pas confondre avec le dossier "templates/" à la racine du projet,
+  # qui est un dossier réservé par Flask pour les pages HTML de l'appli web
+  # (index.html). Ce sont deux choses différentes qui portaient le même nom.
+  document_templates_dir: "data/input/templates"
+
+  uploads_dir: "data/input/uploads"   # réservé pour un futur upload direct depuis le navigateur (non utilisé pour l'instant)
+
+  output_dir: "data/output"
+  pdf_dir: "data/output/pdfs"
+  doc_dir: "data/output/docs"
+  logs_dir: "data/logs"
+
+# --------------------------------------------
+# Fichiers par défaut
+# --------------------------------------------
+default_files:
+  # Template principal pour le publipostage (dans document_templates_dir)
+  template_file: "fiche PS association 2024.docx"
+  # Modèles d'email (dans document_templates_dir) : ce sont des fichiers .html
+  # avec des placeholders Jinja2 ({{ Nom }}, {{ Email }}, ...), pas des .docx.
+  email_templates:
+    - "modele_email_ccas.html"
+    - "modele_email_autre.html"
+  default_csv: "bilan_PS_global_2024_ps_2_lignes.csv"
+
+# --------------------------------------------
+# Paramètres de traitement
+# --------------------------------------------
+processing:
+  max_upload_size: 50
+  max_files_per_campaign: 10
+  email_delay: 5
+  generate_pdf: true
+  # Valeur par défaut de la case "Envoyer les emails" dans le formulaire web
+  send_emails_default: false
+
+# --------------------------------------------
+# Paramètres SMTP
+# --------------------------------------------
+# ⚠️ smtp_user et smtp_password ne doivent JAMAIS être mis ici (ce fichier
+# peut être versionné dans Git). Ils vivent uniquement dans le fichier .env
+# (non versionné), lu par le script via os.getenv().
+email:
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+
+# --------------------------------------------
+# Configuration de la base de données
+# --------------------------------------------
+database:
+  path: "data/campagnes.db"
+  table_name: "campagnes"
+
+# --------------------------------------------
+# Messages personnalisés (pour les logs et l'interface)
+# --------------------------------------------
+messages:
+  success: "Campagne terminée avec succès !"
+  error: "Une erreur est survenue : "
+  processing: "Traitement en cours..."
+  no_files: "Aucun fichier trouvé. Vérifiez les chemins."

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outil de Publipostage</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        .form-group { margin-bottom: 15px; }
+        select { margin-bottom: 10px; display: block; }
+        label.checkbox { display: flex; align-items: center; gap: 8px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #45a049; }
+        #logs { margin-top: 20px; padding: 10px; background-color: #f4f4f4; border: 1px solid #ddd; height: 200px; overflow-y: scroll; font-family: monospace; white-space: pre-wrap; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .status-en-cours { color: orange; }
+        .status-termine { color: green; }
+        .status-erreur { color: red; }
+        #email-options { margin-left: 20px; padding-left: 10px; border-left: 2px solid #ddd; }
+
+        .upload-section { margin-bottom: 25px; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; }
+        .upload-zone { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .upload-zone label { min-width: 220px; font-weight: bold; }
+        .upload-zone button { background-color: #2196F3; padding: 8px 14px; font-size: 14px; }
+        .upload-zone button:hover { background-color: #1976D2; }
+        .upload-message { font-size: 14px; margin-left: 5px; }
+        .upload-message.success { color: green; }
+        .upload-message.error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Outil de Publipostage</h1>
+
+    <div class="upload-section">
+        <h2>📁 Importer des fichiers</h2>
+
+        <div class="upload-zone">
+            <label for="csv-file">Fichier CSV des bénéficiaires :</label>
+            <input type="file" id="csv-file" accept=".csv">
+            <button type="button" onclick="uploadFile('csv-file', '/upload/csv', 'csv', loadCsvList)">Importer</button>
+            <span class="upload-message" id="csv-upload-message"></span>
+        </div>
+
+        <div class="upload-zone">
+            <label for="docx-file">Template de document (.docx) :</label>
+            <input type="file" id="docx-file" accept=".docx">
+            <button type="button" onclick="uploadFile('docx-file', '/upload/template', 'docx', loadTemplateList)">Importer</button>
+            <span class="upload-message" id="docx-upload-message"></span>
+        </div>
+
+        <div class="upload-zone">
+            <label for="email-file">Modèle d'email (.html) :</label>
+            <input type="file" id="email-file" accept=".html">
+            <button type="button" onclick="uploadFile('email-file', '/upload/email_template', 'email', loadEmailTemplateList)">Importer</button>
+            <span class="upload-message" id="email-upload-message"></span>
+        </div>
+    </div>
+
+    <form action="/upload" method="post" id="campaign-form">
+        <div class="form-group">
+            <label for="csv">Fichier CSV :</label>
+            <select name="csv" id="csv" required>
+                <option value="" disabled selected>Sélectionnez un fichier CSV</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="docx">Template DOCX (fiche PS) :</label>
+            <select name="docx" id="docx" required>
+                <option value="" disabled selected>Sélectionnez un template DOCX</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox">
+                <input type="checkbox" name="send_emails" id="send_emails" {% if default_send_emails %}checked{% endif %}>
+                Envoyer les emails maintenant
+            </label>
+        </div>
+
+        <div id="email-options">
+            <div class="form-group">
+                <label class="checkbox">
+                    <input type="checkbox" name="personalize" id="personalize">
+                    Personnaliser le corps des emails avec les données du CSV
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="email_template">Modèle email :</label>
+                <select name="email_template" id="email_template">
+                    <option value="" disabled selected>Sélectionnez un modèle email</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit">Lancer la campagne</button>
+    </form>
+
+    <h2>Historique des campagnes</h2>
+    <table id="history-table">
+        <thead>
+            <tr><th>Date</th><th>Fichier CSV</th><th>Template DOCX</th><th>Statut</th><th>Logs</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h2>Logs en temps réel</h2>
+    <div id="logs">Aucune campagne en cours.</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let currentCampaignId = null;
+
+            function fillSelect(selectEl, files, emptyLabel) {
+                selectEl.innerHTML = '';
+                if (files.length === 0) {
+                    selectEl.innerHTML = `<option value="" disabled selected>${emptyLabel}</option>`;
+                    return;
+                }
+                files.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    selectEl.appendChild(option);
+                });
+            }
+
+            function loadList(url, selectEl, emptyLabel) {
+                fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`Erreur HTTP : ${r.status}`);
+                        return r.json();
+                    })
+                    .then(files => fillSelect(selectEl, files, emptyLabel))
+                    .catch(err => {
+                        selectEl.innerHTML = `<option value="" disabled selected>Erreur : ${err.message}</option>`;
+                    });
+            }
+
+            function loadCsvList() {
+                loadList('/list/csv', document.getElementById('csv'), 'Aucun fichier CSV trouvé');
+            }
+            function loadTemplateList() {
+                loadList('/list/templates', document.getElementById('docx'), 'Aucun template DOCX trouvé');
+            }
+            function loadEmailTemplateList() {
+                loadList('/list/email_templates', document.getElementById('email_template'), 'Aucun modèle email trouvé');
+            }
+            // Exposées globalement pour les boutons "Importer"
+            window.loadCsvList = loadCsvList;
+            window.loadTemplateList = loadTemplateList;
+            window.loadEmailTemplateList = loadEmailTemplateList;
+
+            loadCsvList();
+            loadTemplateList();
+            loadEmailTemplateList();
+
+            const sendEmailsCheckbox = document.getElementById('send_emails');
+            const emailOptions = document.getElementById('email-options');
+            const emailTemplateSelect = document.getElementById('email_template');
+
+            function toggleEmailOptions() {
+                emailOptions.style.display = sendEmailsCheckbox.checked ? 'block' : 'none';
+                emailTemplateSelect.required = sendEmailsCheckbox.checked;
+            }
+            sendEmailsCheckbox.addEventListener('change', toggleEmailOptions);
+            toggleEmailOptions();
+
+            function updateLogs() {
+                if (!currentCampaignId) return;
+                fetch(`/logs/${currentCampaignId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const logsDiv = document.getElementById('logs');
+                        const statusClass = data.status.toLowerCase().replace(/\s+/g, '-');
+                        logsDiv.innerHTML = `<p>Statut : <span class="status-${statusClass}">${data.status}</span></p><pre>${data.logs.join('\n')}</pre>`;
+                    })
+                    .catch(err => console.error('Erreur :', err));
+            }
+
+            function loadHistory() {
+                fetch('/history')
+                    .then(r => r.json())
+                    .then(data => {
+                        const tableBody = document.querySelector('#history-table tbody');
+                        tableBody.innerHTML = '';
+                        if (data.length === 0) {
+                            tableBody.innerHTML = '<tr><td colspan="5">Aucune campagne enregistrée.</td></tr>';
+                            return;
+                        }
+                        data.forEach(c => {
+                            const statusClass = c.statut.toLowerCase().replace(/\s+/g, '-');
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${c.date}</td>
+                                <td>${c.fichier_csv}</td>
+                                <td>${c.template_docx}</td>
+                                <td class="status-${statusClass}">${c.statut}</td>
+                                <td><button class="view-logs" data-campaign-id="${c.id}">Voir</button></td>`;
+                            tableBody.appendChild(row);
+                            if (c.statut === 'En cours') currentCampaignId = c.id;
+                        });
+                        document.querySelectorAll('.view-logs').forEach(btn => {
+                            btn.addEventListener('click', function () {
+                                currentCampaignId = parseInt(this.dataset.campaignId);
+                                updateLogs();
+                            });
+                        });
+                    })
+                    .catch(err => console.error('Erreur :', err));
+            }
+
+            setInterval(loadHistory, 5000);
+            setInterval(updateLogs, 2000);
+            loadHistory();
+        });
+
+        async function uploadFile(inputId, endpoint, messageElSuffix, refreshFn) {
+            const input = document.getElementById(inputId);
+            const messageEl = document.getElementById(`${messageElSuffix}-upload-message`);
+
+            if (!input.files.length) {
+                messageEl.textContent = 'Choisis d\'abord un fichier.';
+                messageEl.className = 'upload-message error';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+            messageEl.textContent = 'Import en cours...';
+            messageEl.className = 'upload-message';
+
+            try {
+                const response = await fetch(endpoint, { method: 'POST', body: formData });
+                const result = await response.json();
+
+                messageEl.textContent = result.message;
+                messageEl.className = 'upload-message ' + (result.success ? 'success' : 'error');
+
+                if (result.success) {
+                    input.value = '';
+                    if (typeof refreshFn === 'function') refreshFn();
+                }
+            } catch (err) {
+                messageEl.textContent = 'Erreur réseau : ' + err.message;
+                messageEl.className = 'upload-message error';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Secrets
+.env
+.env.default
+venv-build/
+build/
+dist/
+__pycache__/
+*.pyc
+data/
+*.db
