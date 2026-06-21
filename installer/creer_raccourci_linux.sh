@@ -1,32 +1,44 @@
- # Crée un raccourci Bureau pour Publipostage.
+#!/usr/bin/env bash
+# Crée un raccourci Bureau pour Publipostage.
 # À lancer une seule fois après extraction du zip, depuis le même dossier
-# que l'exécutable publipostage-windows.exe.
-#
-# Si Windows refuse l'exécution (script bloqué car téléchargé depuis
-# Internet), faire un clic droit sur ce fichier > Propriétés >
-# cocher "Débloquer", ou lancer dans PowerShell :
-#   Unblock-File .\creer_raccourci_windows.ps1
+# que l'exécutable publipostage-linux.
+set -euo pipefail
 
-$ErrorActionPreference = "Stop"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXE_PATH="$SCRIPT_DIR/publipostage-linux"
+DESKTOP_DIR="$HOME/Desktop"
+DESKTOP_FILE="$DESKTOP_DIR/Publipostage.desktop"
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ExePath = Join-Path $ScriptDir "publipostage-windows.exe"
-
-if (-not (Test-Path $ExePath)) {
-    Write-Host "Erreur : executable introuvable a $ExePath"
-    Write-Host "Assurez-vous que ce script reste dans le meme dossier que publipostage-windows.exe."
+if [ ! -f "$EXE_PATH" ]; then
+    echo "Erreur : exécutable introuvable à $EXE_PATH"
+    echo "Assurez-vous que ce script reste dans le même dossier que publipostage-linux."
     exit 1
-}
+fi
 
-$DesktopDir = [Environment]::GetFolderPath("Desktop")
-$ShortcutPath = Join-Path $DesktopDir "Publipostage.lnk"
+chmod +x "$EXE_PATH"
 
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-$Shortcut.TargetPath = $ExePath
-$Shortcut.WorkingDirectory = $ScriptDir
-$Shortcut.Description = "Outil de publipostage - Banque Alimentaire 22"
-$Shortcut.Save()
+mkdir -p "$DESKTOP_DIR"
 
-Write-Host "Raccourci cree sur le Bureau : $ShortcutPath"
-Write-Host "Vous pouvez maintenant double-cliquer dessus pour lancer Publipostage."
+cat > "$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Publipostage
+Comment=Outil de publipostage - Banque Alimentaire 22
+Exec="$EXE_PATH"
+Terminal=false
+Categories=Utility;
+EOF
+
+chmod +x "$DESKTOP_FILE"
+
+# Sur certains environnements (GNOME notamment), un fichier .desktop
+# fraîchement créé est considéré "non fiable" tant qu'il n'est pas
+# marqué comme exécutable de confiance. On tente de le marquer
+# automatiquement ; si ça échoue, l'utilisateur devra faire
+# clic droit > "Autoriser le lancement" une fois.
+if command -v gio >/dev/null 2>&1; then
+    gio set "$DESKTOP_FILE" metadata::trusted true 2>/dev/null || true
+fi
+
+echo "Raccourci créé sur le Bureau : $DESKTOP_FILE"
+echo "Vous pouvez maintenant double-cliquer dessus pour lancer Publipostage."
