@@ -13,6 +13,7 @@ aucune installation de Python requise côté volontaire.
 - [Build automatique (GitHub Actions)](#build-automatique-github-actions)
 - [Où vivent les données](#où-vivent-les-données)
 - [Dépannage](#dépannage)
+- [Installation](#Installation pour les volontaires)
 
 ---
 
