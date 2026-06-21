@@ -192,3 +192,35 @@ par l'interface web (upload de fichiers, config SMTP pré-remplie).
 | Email non envoyé, pas d'erreur visible | `.env` absent ou mal placé dans `DATA_DIR` | Vérifier via le bouton "Tester la connexion" de l'interface |
 | `Resource not accessible by integration` sur la release CI | Permissions par défaut du `GITHUB_TOKEN` trop restrictives | `permissions: contents: write` sur le job `release` (déjà en place) + vérifier les Workflow permissions du repo |
 | Conversion PDF échoue | LibreOffice absent du PATH sur la machine du volontaire | Prérequis à documenter dans le guide d'installation : LibreOffice doit être installé séparément |
+
+## Installation pour les volontaires
+
+Après avoir téléchargé et extrait le zip correspondant à votre système :
+
+### Linux
+
+1. Extraire l'archive `publipostage-linux.zip`
+2. Ouvrir un terminal dans le dossier extrait
+3. Lancer le script de configuration :
+```bash
+   ./creer_raccourci_linux.sh
+```
+4. Une icône **Publipostage** apparaît sur le Bureau. Double-cliquez dessus pour lancer l'application.
+
+> Si le raccourci ne se lance pas au premier double-clic (message "non fiable"), faites un clic droit dessus puis choisissez *Autoriser le lancement* (ou *Trust/Launch*, selon votre environnement de bureau).
+
+### Windows
+
+1. Extraire l'archive `publipostage-windows.zip`
+2. Faire un clic droit sur `creer_raccourci_windows.ps1` → **Exécuter avec PowerShell**
+3. Une icône **Publipostage** apparaît sur le Bureau. Double-cliquez dessus pour lancer l'application.
+
+> Si Windows refuse l'exécution du script (fichier bloqué car téléchargé d'Internet) :
+> - clic droit sur le fichier → **Propriétés** → cocher **Débloquer** → OK, puis relancer,
+> - ou en PowerShell : `Unblock-File .\creer_raccourci_windows.ps1`
+
+### Notes techniques
+
+- Les scripts de raccourci (`installer/creer_raccourci_linux.sh` et `installer/creer_raccourci_windows.ps1`) sont inclus automatiquement dans chaque paquet par la CI (`.github/workflows/build.yml`).
+- Ils utilisent un chemin **relatif à leur propre emplacement** : le dossier extrait peut être déplacé n'importe où, le raccourci pointera toujours vers l'exécutable correspondant.
+- Le raccourci n'a besoin d'être créé **qu'une seule fois** par installation ; il reste valide tant que le dossier extrait n'est pas déplacé ou supprimé.
