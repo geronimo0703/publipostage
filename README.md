@@ -17,8 +17,6 @@ aucune installation de Python requise côté volontaire.
 ---
 
 ## Architecture
-
-```
 Publipostage_comptable/
 ├── app.py                      # Serveur Flask, point d'entrée
 ├── publipostage.spec           # Config PyInstaller
@@ -30,8 +28,14 @@ Publipostage_comptable/
 │   └── publipostage_stock_ed7.py  # Logique métier, importée par app.py
 ├── templates/
 │   └── index.html              # Interface web
+├── .github/
+│   └── workflows/
+│       └── build.yml            # CI : build Windows + Ubuntu sur tag
 └── .github/workflows/
-    └── build.yml               # CI : build Windows + Ubuntu sur tag
+    └── build.yml              
+├── installer/
+│   ├── creer_raccourci_linux.sh
+│   └── creer_raccourci_windows.ps1
 ```
 
 Points clés à retenir si tu reprends ce projet plus tard :
