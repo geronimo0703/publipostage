@@ -30,6 +30,7 @@
         .upload-message.success { color: green; }
         .upload-message.error { color: red; }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <h1>Outil de Publipostage</h1>
@@ -95,8 +96,14 @@
                 </select>
             </div>
         </div>
-
-        <button type="submit">Lancer la campagne</button>
+        <div class="form-actions">
+            <button type="submit">Lancer la campagne</button>
+            <button type="button" class="btn-exit"
+                    onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
+                🚪 Quitter
+            </button>
+            <a href="{{ url_for('help_page') }}" target="_blank" class="btn-help">❓ Aide</a>
+        </div>
     </form>
 
     <h2>Historique des campagnes</h2>

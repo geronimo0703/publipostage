@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Aide — Publipostage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="help-container">
+    <h1>ℹ️ Préparer votre campagne</h1>
+    <p>Avant de lancer la campagne, votre fichier CSV doit contenir certaines colonnes selon ce que vous souhaitez faire.</p>
+
+    <div class="help-section">
+        <h2>📧 Envoi des e-mails</h2>
+        <table class="help-table">
+            <thead>
+                <tr>
+                    <th>Colonne</th>
+                    <th>Obligatoire</th>
+                    <th>Description</th>
+                    <th>Exemples acceptés</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Email</code></td>
+                    <td>✅ Oui</td>
+                    <td>Adresse e-mail du destinataire</td>
+                    <td>Email, Mail, e-mail, courriel</td>
+                </tr>
+                <tr>
+                    <td><code>Sujet</code></td>
+                    <td>⚪ Non</td>
+                    <td>Objet du mail (sinon valeur par défaut config)</td>
+                    <td>Sujet, Objet, Subject</td>
+                </tr>
+                <tr>
+                    <td><code>Client</code></td>
+                    <td>⚪ Non</td>
+                    <td>Nom affiché dans les logs d'envoi</td>
+                    <td>Client, Nom, Prénom, Bénéficiaire</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="help-section">
+        <h2>📄 Génération des documents (DOCX / PDF)</h2>
+        <table class="help-table">
+            <thead>
+                <tr>
+                    <th>Colonne</th>
+                    <th>Obligatoire</th>
+                    <th>Description</th>
+                    <th>Exemples acceptés</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Nom_fichier</code></td>
+                    <td>✅ Oui</td>
+                    <td>Nom du fichier généré (sans extension)</td>
+                    <td>Nom_fichier, Fichier, filename</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="help-note">
+        💡 Les noms de colonnes ne sont pas sensibles à la casse et les variantes courantes sont détectées automatiquement.
+        En cas de doute, l'étape suivante vous permettra de faire le lien manuellement.
+    </div>
+
+    <div class="help-section">
+        <h2>✏️ Personnalisation des modèles (placeholders)</h2>
+        <p>Dans vos modèles DOCX et HTML, vous pouvez insérer des variables qui seront remplacées automatiquement par les valeurs du CSV.</p>
+        <p>La syntaxe est <code>{{ '{{Nom_de_la_colonne}}' }}</code> — le nom doit correspondre exactement à l'en-tête de la colonne dans le CSV.</p>
+
+        <table class="help-table">
+            <thead>
+                <tr>
+                    <th>Dans le CSV</th>
+                    <th>Placeholder dans le modèle</th>
+                    <th>Exemple de résultat</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Client</code></td>
+                    <td><code>{{ '{{Client}}' }}</code></td>
+                    <td>Dupont Marie</td>
+                </tr>
+                <tr>
+                    <td><code>Montant</code></td>
+                    <td><code>{{ '{{Montant}}' }}</code></td>
+                    <td>45.00</td>
+                </tr>
+                <tr>
+                    <td><code>Ville</code></td>
+                    <td><code>{{ '{{Ville}}' }}</code></td>
+                    <td>Saint-Brieuc</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="help-note">
+            💡 Exemple : <code>Bonjour {{ '{{Client}}' }}, veuillez trouver ci-joint votre document pour un montant de {{ '{{Montant}}' }} €.</code>
+        </div>
+    </div>
+
+    <div class="help-actions">
+        <a href="{{ url_for('index') }}" class="btn-primary">← Retour</a>
+    </div>
+</div>
+
+</body>
+</html>

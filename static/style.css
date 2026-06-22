@@ -1,0 +1,95 @@
+ 
+<style>
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .btn-exit {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .btn-exit:hover {
+        background-color: #c0392b;
+    }
+
+    .help-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    font-family: sans-serif;
+    }
+
+    .help-section {
+        margin: 2rem 0;
+    }
+
+    .help-section h2 {
+        margin-bottom: 0.8rem;
+    }
+
+    .help-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .help-table th, .help-table td {
+        border: 1px solid #ddd;
+        padding: 0.6rem 0.9rem;
+        text-align: left;
+    }
+
+    .help-table th {
+        background-color: #f4f4f4;
+    }
+
+    .help-table code {
+        background: #eef;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+    }
+
+    .help-note {
+        background: #fffbe6;
+        border-left: 4px solid #f0c040;
+        padding: 0.8rem 1rem;
+        margin: 1.5rem 0;
+        border-radius: 3px;
+    }
+
+    .help-actions {
+        margin-top: 2rem;
+        text-align: right;
+    }
+
+    .btn-primary {
+        background-color: #2980b9;
+        color: white;
+        padding: 0.7rem 1.4rem;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 1rem;
+    }
+
+    .btn-primary:hover {
+        background-color: #1f6391;
+    }
+    .btn-help {
+    background-color: #27ae60;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 1rem;
+    }
+
+    .btn-help:hover {
+        background-color: #1e8449;
+}
+</style>

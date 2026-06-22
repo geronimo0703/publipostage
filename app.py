@@ -1,4 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+# ==============================================================================
+# app.py
+# Changelog :
+#   ed1 : ajout d'un bouton "exit"
+#   ed1 : ajour d'un help
+#
+# ==============================================================================
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 from werkzeug.utils import secure_filename
 import os
 import sqlite3
@@ -10,6 +17,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import webbrowser
 import threading
+import signal
 
 APP_NAME = "Publipostage"
 APP_AUTHOR = "BanqueAlimentaire22"
@@ -45,6 +53,7 @@ app = Flask(
     template_folder=str(RESOURCE_DIR / "templates"),
     static_folder=str(RESOURCE_DIR / "static"),
 )
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "publipostage-dev-key")
 
 # --------------------------------------------
 # Répertoire des données utilisateur (écriture, persistant)
@@ -103,6 +112,16 @@ campaign_logs = {}
 # --------------------------------------------
 # Routes
 # --------------------------------------------
+@app.route("/help")
+def help_page():
+    return render_template("help.html")
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    """Arrête le serveur Flask proprement."""
+    os.kill(os.getpid(), signal.SIGTERM)
+    return ("", 204)
+
 @app.route('/')
 def index():
     return render_template(
@@ -183,7 +202,6 @@ def upload_files():
         return redirect(request.url)
 
     if send_emails and not email_template_filename:
-        # Pas de modèle sélectionné : on ne peut pas envoyer d'emails
         return redirect(request.url)
 
     email_template_path = (
@@ -201,7 +219,6 @@ def upload_files():
     conn.close()
 
     campaign_logs[campaign_id] = {"status": "En attente", "logs": []}
-
     threading.Thread(
         target=lancer_campagne,
         args=(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id),
@@ -209,7 +226,6 @@ def upload_files():
     ).start()
 
     return redirect(url_for('index'))
-
 
 def _update_campaign(campaign_id, statut, logs_lines):
     conn = sqlite3.connect(str(DB_PATH))
