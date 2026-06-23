@@ -102,7 +102,7 @@
                     onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
                 🚪 Quitter
             </button>
-            <a href="{{ url_for('help_page') }}" target="_blank" class="btn-help">❓ Aide</a>
+            <a href="{{ url_for('help_page') }}" class="btn-help">❓ Aide</a>
         </div>
     </form>
 
