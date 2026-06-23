@@ -138,7 +138,7 @@ def index():
 def list_csv_files():
     files = sorted(
         f.name for f in CSV_DIR.iterdir()
-        if f.suffix.lower() in {'.csv', '.xlsx'}
+        if f.suffix.lower() in {'.csv', '.xlsx', '.xls'}
     )
     return jsonify(files)
 
@@ -171,12 +171,11 @@ def _save_uploaded_file(file_storage, target_dir: Path, allowed_extensions):
     file_storage.save(target_dir / filename)
     return True, f"Fichier '{filename}' importé avec succès"
 
-
 # upload_csv_or_excel
 @app.route('/upload/csv', methods=['POST'])
 def upload_csv():
     success, message = _save_uploaded_file(
-        request.files.get('file'), CSV_DIR, {'.csv', '.xlsx'}
+        request.files.get('file'), CSV_DIR, {'.csv', '.xlsx', '.xls'}
     )
     return jsonify({"success": success, "message": message})
 

@@ -40,8 +40,9 @@
 
         <div class="upload-zone">
             <label for="csv-file">Fichier CSV ou Excel des bénéficiaires :</label>
-            <input type="file" id="csv-file" accept=".csv,.xlsx">
+            <input type="file" id="csv-file" accept=".csv,.xlsx,.xls">
             <button type="button" onclick="uploadFile('csv-file', '/upload/csv', 'csv', loadCsvList)">Importer</button>
+            <p class="form-hint">⚠️ Privilégiez le format <strong>.xlsx</strong> (Excel ou LibreOffice Calc). Le format .xls ancien peut provoquer des erreurs.</p>
             <span class="upload-message" id="csv-upload-message"></span>
         </div>
 

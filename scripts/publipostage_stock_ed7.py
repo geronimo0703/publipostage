@@ -206,8 +206,23 @@ def run_publipostage(
         # Lecture CSV ou Excel selon l'extension
         suffix = Path(csv_path).suffix.lower()
         if suffix == '.xlsx':
-            df = pd.read_excel(csv_path, sheet_name=0, engine='openpyxl')
-            log("=== COLONNES DU FICHIER EXCEL (feuille 1) ===")
+            try:
+                df = pd.read_excel(csv_path, sheet_name=0, engine='openpyxl')
+                log("=== COLONNES DU FICHIER EXCEL (feuille 1) ===")
+            except Exception:
+                # Fichier .xlsx qui est en réalité un CSV renommé
+                df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
+                log("⚠️  Fichier .xlsx détecté comme CSV — privilégiez un vrai export Excel.")
+                log("=== COLONNES DU FICHIER (détecté comme CSV) ===")
+        elif suffix == '.xls':
+            try:
+                df = pd.read_excel(csv_path, sheet_name=0, engine='xlrd')
+                log("=== COLONNES DU FICHIER EXCEL ancien format (feuille 1) ===")
+            except Exception:
+                # Fichier .xls qui est en réalité un CSV renommé
+                df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
+                log("⚠️  Format .xls détecté — privilégiez .xlsx pour éviter les erreurs de compatibilité.")
+                log("=== COLONNES DU FICHIER EXCEL ancien format (feuille 1) ===")
         else:
             df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
             log("=== COLONNES DU CSV ===")
@@ -287,8 +302,9 @@ def run_publipostage(
                 df.at[index, "Statut"] = "Non envoyé (mode test)"
             log("=====================================================================")
 
-        df.to_csv(csv_path, index=False)
-        log(f"✅ Le fichier {csv_path} a été mis à jour avec les statuts.")
+        statuts_path = logs_dir / f"statuts_{Path(csv_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        df.to_csv(statuts_path, index=False, encoding='utf-8-sig')
+        log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
         log("✨ Tous les documents ont été générés et convertis en PDF.")
 
         return {"success": True, "logs": logs, "log_file": str(log_filename)}
