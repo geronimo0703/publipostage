@@ -82,6 +82,11 @@ for d in (CSV_DIR, DOC_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent
 load_dotenv(DATA_DIR / ".env")
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+# Diagnostic au démarrage
+if not SMTP_USER or not SMTP_PASSWORD:
+    print(f"⚠️  SMTP non configuré — fichier .env attendu ici : {DATA_DIR / '.env'}", flush=True)
+else:
+    print(f"✅ SMTP chargé pour : {SMTP_USER}", flush=True)
 SMTP_SERVER = config.get("email", {}).get("smtp_server", "smtp.gmail.com")
 SMTP_PORT = config.get("email", {}).get("smtp_port", 587)
 
@@ -189,7 +194,7 @@ def upload_files():
     csv_filename = request.form.get('csv')
     docx_filename = request.form.get('docx')
     send_emails = request.form.get('send_emails') == 'on'
-    personalize = request.form.get('personalize') == 'on'
+    personalize = True
     email_template_filename = request.form.get('email_template') or None
 
     if not csv_filename or not docx_filename:
