@@ -11,7 +11,7 @@
 #   ed6 : choix du modèle email via une liste déroulante tkinter (jamais
 #          finalisé)
 #   ed7 : suppression totale de tkinter, options en ligne de commande.
-#   ed8 : extraction de toute la logique dans run_publipostage(), une
+#       : extraction de toute la logique dans run_publipostage(), une
 #          fonction importable directement par app.py (plus de
 #          subprocess + "python3", indispensable pour le binaire
 #          PyInstaller où aucun interpréteur Python n'est garanti sur
@@ -19,6 +19,8 @@
 #          fin de cette fonction, conservé pour les tests en dev.
 #          Suppression des print() de debug qui affichaient le mot de
 #          passe SMTP en clair dans les logs.
+#       : Pour le fichier .csv, possibilité d'avoir un .xslx à la place
+#         => tester le fichier avec pd.read_csv
 # ==============================================================================
 
 import argparse
@@ -201,9 +203,14 @@ def run_publipostage(
         log(f"Envoi des emails : {send_emails}")
         log(f"Personnalisation : {personalize}")
         log(f"Modèle email : {email_template_path}\n")
-
-        df = pd.read_csv(csv_path)
-        log("=== COLONNES DU CSV ===")
+        # Lecture CSV ou Excel selon l'extension
+        suffix = Path(csv_path).suffix.lower()
+        if suffix == '.xlsx':
+            df = pd.read_excel(csv_path, sheet_name=0, engine='openpyxl')
+            log("=== COLONNES DU FICHIER EXCEL (feuille 1) ===")
+        else:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
+            log("=== COLONNES DU CSV ===")
         log(str(df.columns.tolist()))
 
         # On force le type "object" (et pas seulement la création de la

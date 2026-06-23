@@ -134,12 +134,13 @@ def index():
         default_send_emails=DEFAULT_SEND_EMAILS,
     )
 
-
 @app.route('/list/csv')
 def list_csv_files():
-    files = sorted(f.name for f in CSV_DIR.glob("*.csv"))
+    files = sorted(
+        f.name for f in CSV_DIR.iterdir()
+        if f.suffix.lower() in {'.csv', '.xlsx'}
+    )
     return jsonify(files)
-
 
 @app.route('/list/templates')
 def list_template_files():
@@ -171,11 +172,13 @@ def _save_uploaded_file(file_storage, target_dir: Path, allowed_extensions):
     return True, f"Fichier '{filename}' importé avec succès"
 
 
+# upload_csv_or_excel
 @app.route('/upload/csv', methods=['POST'])
 def upload_csv():
-    success, message = _save_uploaded_file(request.files.get('file'), CSV_DIR, {'.csv'})
+    success, message = _save_uploaded_file(
+        request.files.get('file'), CSV_DIR, {'.csv', '.xlsx'}
+    )
     return jsonify({"success": success, "message": message})
-
 
 @app.route('/upload/template', methods=['POST'])
 def upload_template():
