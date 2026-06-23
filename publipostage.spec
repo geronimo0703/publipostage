@@ -6,6 +6,7 @@ a = Analysis(
     datas=[
         ('config/config.yaml', 'config'),
         ('templates', 'templates'),
+        ('static', 'static'),
     ],
     hiddenimports=[
         'email.mime.multipart', 'email.mime.text', 'email.mime.base',
