@@ -108,11 +108,37 @@
             💡 Exemple : <code>Bonjour {{ '{{Client}}' }}, veuillez trouver ci-joint votre document pour un montant de {{ '{{Montant}}' }} €.</code>
         </div>
     </div>
+        <div class="help-section">
+            <h2>🚀 Lancer une campagne</h2>
 
-    <div class="help-actions">
-        <a href="{{ url_for('index') }}" class="btn-primary">← Retour</a>
+            <h3>1. Préparer vos fichiers</h3>
+            <p>Vous aurez besoin de trois fichiers :</p>
+            <ul>
+                <li><strong>La liste des destinataires et les infos associées</strong> : fichier <code>.xlsx</code>, <code>.xls</code> ou <code>.csv</code> contenant une ligne par client. <strong>Privilégier l'extension .xslx</strong></li>
+                <li><strong>Le modèle de courrier</strong> : fichier <code>.docx</code> (Word) avec vos placeholders <code>{{ '{{Nom_colonne}}' }}</code>.</li>
+                <li><strong>Le modèle d'email</strong> : fichier <code>.html</code> avec le corps du message, également personnalisable avec des placeholders.</li>
+            </ul>
+
+            <h3>2. Sélectionner et importer les fichiers</h3>
+            <p>Sur la page principale, déposez chaque fichier dans la zone correspondante (glisser-déposer ou clic pour parcourir) et cliquer sur "Importer".</p>
+
+            <h3>3. Vérifier la correspondance des colonnes</h3>
+            <p>L'application détecte automatiquement les colonnes de votre fichier. Vérifiez que chaque champ est bien associé à la bonne colonne et corrigez si nécessaire.</p>
+
+            <h3>4. Choisir le mode d'envoi</h3>
+            <ul>
+                <li><strong>Mode test</strong> : génère les PDF sans envoyer les emails — idéal pour vérifier le résultat avant l'envoi réel.</li>
+                <li><strong>Mode envoi</strong> : génère les PDF <em>et</em> envoie les emails à chaque destinataire.</li>
+            </ul>
+
+            <h3>5. Lancer et suivre</h3>
+            <p>Cliquez sur <strong>Lancer</strong>. L'avancement s'affiche en temps réel. À la fin, un récapitulatif indique le nombre de mails envoyés et les éventuelles erreurs.</p>
+        </div>
+
+        <div class="help-actions">
+            <a href="{{ url_for('index') }}" class="btn-primary">← Retour</a>
+        </div>
     </div>
-</div>
 
 </body>
 </html>

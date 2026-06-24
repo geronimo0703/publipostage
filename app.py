@@ -54,6 +54,7 @@ app = Flask(
     static_folder=str(RESOURCE_DIR / "static"),
 )
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "publipostage-dev-key")
+#app.run(debug=True, use_reloader=False)
 
 # --------------------------------------------
 # Répertoire des données utilisateur (écriture, persistant)
