@@ -79,9 +79,12 @@ for d in (CSV_DIR, DOC_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent
 # Identifiants SMTP (.env à côté des données utilisateur persistantes,
 # pour que le volontaire puisse les configurer sans rouvrir le binaire)
 # --------------------------------------------
-load_dotenv(DATA_DIR / ".env")
+load_dotenv(DATA_DIR / ".env", override=True)
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_FROM = os.getenv("SMTP_FROM")
+print(f"🔍 SMTP_USER = '{SMTP_USER}'", flush=True)
+print(f"🔍 SMTP_FROM = '{SMTP_FROM}'", flush=True)
 # Diagnostic au démarrage
 if not SMTP_USER or not SMTP_PASSWORD:
     print(f"⚠️  SMTP non configuré — fichier .env attendu ici : {DATA_DIR / '.env'}", flush=True)
@@ -263,6 +266,7 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
             smtp_password=SMTP_PASSWORD,
             smtp_server=SMTP_SERVER,
             smtp_port=SMTP_PORT,
+            smtp_from=SMTP_FROM,
         )
         statut = "Terminé" if result["success"] else "Erreur"
         campaign_logs[campaign_id]["status"] = statut

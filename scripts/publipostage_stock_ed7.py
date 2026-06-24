@@ -88,9 +88,11 @@ def normaliser_destinataires(raw_email: str):
 
 def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=None, personnaliser=False, log=print):
     smtp_user = smtp_config.get("user")
+    smtp_from = smtp_config.get("from", smtp_user)
     smtp_password = smtp_config.get("password")
     smtp_server = smtp_config.get("server", "smtp.gmail.com")
     smtp_port = smtp_config.get("port", 587)
+    print(f"🔍 smtp_from dans send_email = '{smtp_from}'", flush=True)
 
     if not smtp_user or not smtp_password:
         msg_err = "SMTP_USER / SMTP_PASSWORD manquants (vérifie le fichier .env)"
@@ -108,7 +110,7 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
         return False, "Aucune adresse email valide"
 
     msg = MIMEMultipart()
-    msg["From"] = smtp_user
+    msg["From"] = smtp_from
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
     msg.attach(MIMEText(corps, "html"))
@@ -149,6 +151,7 @@ def run_publipostage(
     smtp_password: str = None,
     smtp_server: str = "smtp.gmail.com",
     smtp_port: int = 587,
+    smtp_from: str = None,
 ):
     """
     Exécute le traitement complet : génère les fiches docx/pdf à partir du
@@ -183,6 +186,7 @@ def run_publipostage(
         "password": smtp_password,
         "server": smtp_server,
         "port": smtp_port,
+        "from": smtp_from or smtp_user,
     }
 
     logs = []
