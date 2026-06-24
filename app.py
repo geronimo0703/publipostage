@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 import webbrowser
 import threading
 import signal
+import mammoth
 
 APP_NAME = "Publipostage"
 APP_AUTHOR = "BanqueAlimentaire22"
@@ -151,12 +152,13 @@ def list_template_files():
     files = sorted(f.name for f in DOC_TEMPLATES_DIR.glob("*.docx"))
     return jsonify(files)
 
-
 @app.route('/list/email_templates')
 def list_email_templates():
-    files = sorted(f.name for f in DOC_TEMPLATES_DIR.glob("*.html"))
+    files = sorted(
+        f.name for f in DOC_TEMPLATES_DIR.iterdir()
+        if f.suffix.lower() in {'.html', '.docx'}
+    )
     return jsonify(files)
-
 
 def _save_uploaded_file(file_storage, target_dir: Path, allowed_extensions):
     """
@@ -191,7 +193,7 @@ def upload_template():
 
 @app.route('/upload/email_template', methods=['POST'])
 def upload_email_template():
-    success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.html'})
+    success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.html', '.docx'})
     return jsonify({"success": success, "message": message})
 
 

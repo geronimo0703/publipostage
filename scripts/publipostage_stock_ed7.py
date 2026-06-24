@@ -21,6 +21,7 @@
 #          passe SMTP en clair dans les logs.
 #       : Pour le fichier .csv, possibilité d'avoir un .xslx à la place
 #         => tester le fichier avec pd.read_csv
+#       : pour le message, accepter .html ou .docx
 # ==============================================================================
 
 import argparse
@@ -70,12 +71,27 @@ def lire_modele_email(chemin_fichier: Path, data=None, personnaliser=False, log=
     if not chemin_fichier.exists():
         log(f"⚠️ Le fichier {chemin_fichier} est introuvable.")
         return None
-    contenu = chemin_fichier.read_text(encoding="utf-8")
+
+    suffix = chemin_fichier.suffix.lower()
+
+    if suffix == ".docx":
+        import mammoth
+        with open(chemin_fichier, "rb") as f:
+            result = mammoth.convert_to_html(f)
+        contenu = result.value
+        #log(f"🔍 mammoth output : {contenu[:200]}")
+        if result.messages:
+            for msg in result.messages:
+                log(f"⚠️ mammoth : {msg}")
+    elif suffix == ".html":
+        contenu = chemin_fichier.read_text(encoding="utf-8")
+    else:
+        log(f"⚠️ Format non supporté pour le modèle email : {suffix}")
+        return None
+
     if personnaliser and data:
-        # Les colonnes AVEC espace (ex. "Nom fichier") ne sont pas un
-        # identifiant Jinja2 valide en {{ Nom fichier }} et doivent
-        # s'écrire {{ data['Nom fichier'] }}.
         contenu = Template(contenu).render(data=data, **data)
+
     return contenu
 
 
