@@ -168,6 +168,7 @@ def run_publipostage(
     smtp_server: str = "smtp.gmail.com",
     smtp_port: int = 587,
     smtp_from: str = None,
+    dry_run: bool = False,
 ):
     """
     Exécute le traitement complet : génère les fiches docx/pdf à partir du
@@ -193,6 +194,7 @@ def run_publipostage(
     doc_dir = Path(doc_dir)
     logs_dir = Path(logs_dir)
     email_template_path = Path(email_template_path) if email_template_path else None
+    previews = []
 
     for d in (pdf_dir, doc_dir, logs_dir):
         d.mkdir(parents=True, exist_ok=True)
@@ -266,6 +268,20 @@ def run_publipostage(
                 df.at[index, "Statut"] = "Erreur: Nom_fichier manquant"
                 continue
 
+            # ajout d'un dry_run
+            if dry_run:
+                email_preview = lire_modele_email(
+                    email_template_path, data=data,
+                    personnaliser=personalize, log=log
+                ) if email_template_path else None
+                previews.append({
+                    "nom":    data.get("Nom_fichier", "?"),
+                    "email":  data.get("Email", "—"),
+                    "sujet":  data.get("Sujet", "—"),
+                    "apercu": (email_preview[:200] + "…") if email_preview else "—",
+                })
+                continue
+
             doc = Document(template_path)
 
             for paragraph in doc.paragraphs:
@@ -327,7 +343,7 @@ def run_publipostage(
         log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
         log("✨ Tous les documents ont été générés et convertis en PDF.")
 
-        return {"success": True, "logs": logs, "log_file": str(log_filename)}
+        return {"success": True, "logs": logs, "log_file": str(log_filename), "previews": previews}
 
     except Exception as e:
         log(f"❌ Erreur fatale : {e}")

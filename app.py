@@ -313,7 +313,40 @@ def history():
         "statut": row[4]
     } for row in campagnes])
 
+@app.route('/preview', methods=['POST'])
+def preview():
+    csv_filename = request.form.get('csv')
+    docx_filename = request.form.get('docx')
+    send_emails = request.form.get('send_emails') == 'on'
+    email_template_filename = request.form.get('email_template') or None
 
+    csv_path = CSV_DIR / csv_filename
+    docx_path = DOC_TEMPLATES_DIR / docx_filename
+    email_template_path = DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+
+    result = run_publipostage(
+        csv_path=csv_path,
+        template_path=docx_path,
+        pdf_dir=PDF_DIR,
+        doc_dir=DOC_DIR,
+        logs_dir=LOGS_DIR,
+        send_emails=send_emails,
+        personalize=True,
+        email_template_path=email_template_path,
+        smtp_user=SMTP_USER,
+        smtp_password=SMTP_PASSWORD,
+        smtp_server=SMTP_SERVER,
+        smtp_port=SMTP_PORT,
+        smtp_from=SMTP_FROM,
+        dry_run=True,
+    )
+
+    return render_template(
+        'preview.html',
+        previews=result.get("previews", []),
+        form=request.form,          # pour repasser les paramètres au formulaire /upload
+        send_emails=send_emails,
+    )
 def open_browser():
     webbrowser.open("http://127.0.0.1:5000")
 
