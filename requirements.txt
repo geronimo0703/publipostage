@@ -7,3 +7,4 @@ jinja2
 platformdirs
 openpyxl
 xlrd
+mammoth==1.12.0
