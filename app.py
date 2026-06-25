@@ -5,7 +5,7 @@
 #   ed1 : ajour d'un help
 #
 # ==============================================================================
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_file
 from werkzeug.utils import secure_filename
 import os
 import sqlite3
@@ -341,15 +341,27 @@ def preview():
         dry_run=True,
     )
 
+    # Stocker le chemin du PDF en session pour le servir ensuite
+    session['preview_pdf'] = result.get("preview_pdf")
+
     return render_template(
         'preview.html',
         previews=result.get("previews", []),
-        form=request.form,          # pour repasser les paramètres au formulaire /upload
+        form=request.form,
         send_emails=send_emails,
+        has_pdf=bool(result.get("preview_pdf")),
     )
+
+
+@app.route('/preview/pdf')
+def preview_pdf():
+    pdf_path = session.get('preview_pdf')
+    if not pdf_path or not Path(pdf_path).exists():
+        return "PDF non disponible", 404
+    return send_file(pdf_path, mimetype='application/pdf')
+
 def open_browser():
     webbrowser.open("http://127.0.0.1:5000")
-
 
 if __name__ == '__main__':
     debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"

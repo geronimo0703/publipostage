@@ -195,6 +195,7 @@ def run_publipostage(
     logs_dir = Path(logs_dir)
     email_template_path = Path(email_template_path) if email_template_path else None
     previews = []
+    preview_pdf_path = None
 
     for d in (pdf_dir, doc_dir, logs_dir):
         d.mkdir(parents=True, exist_ok=True)
@@ -278,8 +279,37 @@ def run_publipostage(
                     "nom":    data.get("Nom_fichier", "?"),
                     "email":  data.get("Email", "—"),
                     "sujet":  data.get("Sujet", "—"),
-                    "apercu": (email_preview[:200] + "…") if email_preview else "—",
+                    "apercu": email_preview if email_preview else "—",
                 })
+
+                # Générer le PDF uniquement pour la première ligne valide
+                if preview_pdf_path is None:
+                    doc = Document(template_path)
+                    for paragraph in doc.paragraphs:
+                        for key, value in data.items():
+                            if pd.notna(value):
+                                clean_value = str(value).strip().replace('\n', ' ').replace('\r', '')
+                                placeholder = f"{{{{{key}}}}}"
+                                if placeholder in paragraph.text:
+                                    paragraph.text = paragraph.text.replace(placeholder, clean_value)
+                    for table in doc.tables:
+                        for trow in table.rows:
+                            for cell in trow.cells:
+                                for paragraph in cell.paragraphs:
+                                    for key, value in data.items():
+                                        placeholder = f"{{{{{key}}}}}"
+                                        if placeholder in paragraph.text:
+                                            paragraph.text = paragraph.text.replace(placeholder, str(value))
+                    doc.add_paragraph(f"\nFait à Lannion, le {data['DATE_DU_JOUR']}")
+
+                    preview_docx = doc_dir / f"_preview_{data['Nom_fichier']}.docx"
+                    doc.save(preview_docx)
+                    preview_pdf = pdf_dir / f"_preview_{data['Nom_fichier']}.pdf"
+                    convert_docx_to_pdf(preview_docx, preview_pdf, log=log)
+                    preview_docx.unlink(missing_ok=True)   # on garde pas le docx
+                    if preview_pdf.exists():
+                        preview_pdf_path = preview_pdf
+# #
                 continue
 
             doc = Document(template_path)
@@ -343,7 +373,13 @@ def run_publipostage(
         log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
         log("✨ Tous les documents ont été générés et convertis en PDF.")
 
-        return {"success": True, "logs": logs, "log_file": str(log_filename), "previews": previews}
+        return {
+                    "success": True,
+                    "logs": logs,
+                    "log_file": str(log_filename),
+                    "previews": previews,
+                    "preview_pdf": str(preview_pdf_path) if preview_pdf_path else None,
+                }
 
     except Exception as e:
         log(f"❌ Erreur fatale : {e}")
