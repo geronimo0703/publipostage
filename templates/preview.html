@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Prévisualisation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+        th { background-color: #f2f2f2; }
+        .apercu { font-size: 12px; color: #555; max-width: 400px; }
+        .actions { margin-top: 20px; display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <h1>👁️ Prévisualisation — {{ previews|length }} fiche(s)</h1>
+    <p>⚠️ Aucun document n'a été généré ni email envoyé. Vérifiez ci-dessous avant de confirmer.</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Bénéficiaire</th>
+                <th>Email destinataire</th>
+                <th>Sujet</th>
+                {% if send_emails %}<th>Aperçu email</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in previews %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ p.nom }}</td>
+                <td>{{ p.email }}</td>
+                <td>{{ p.sujet }}</td>
+                {% if send_emails %}<td class="apercu">{{ p.apercu | safe }}</td>{% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if has_pdf %}
+    <h2>📄 Aperçu d'une fiche (première ligne)</h2>
+        <iframe src="/preview/pdf" width="100%" height="600px"
+                style="border:1px solid #ddd; border-radius:4px;">
+        </iframe>
+    {% endif %}
+
+    <div class="actions">
+        <!-- Confirmation : reposte les mêmes paramètres vers /upload -->
+        <form action="/upload" method="post">
+            {% for key, value in form.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <button type="submit" style="background:#e53935;color:white;padding:10px 20px;border:none;cursor:pointer;font-size:16px;">
+                ✉️ Confirmer et lancer ({{ previews|length }} fiche{{ 's' if previews|length > 1 }})
+            </button>
+        </form>
+        <a href="/" style="padding:10px 20px;background:#757575;color:white;text-decoration:none;">
+            ← Annuler
+        </a>
+    </div>
+</body>
+</html>
