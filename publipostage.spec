@@ -1,4 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
 a = Analysis(
     ['app.py'],
     pathex=['scripts'],
@@ -7,10 +9,12 @@ a = Analysis(
         ('config/config.yaml', 'config'),
         ('templates', 'templates'),
         ('static', 'static'),
+        *collect_data_files('mammoth'),
     ],
     hiddenimports=[
         'email.mime.multipart', 'email.mime.text', 'email.mime.base',
         'publipostage_stock_ed7',
+        *collect_submodules('mammoth'),
     ],
     hookspath=[],
     runtime_hooks=[],
@@ -25,5 +29,5 @@ exe = EXE(
     [],
     name='publipostage',
     debug=False,
-    console=True,  # mets False si tu veux masquer la console (Windows)
+    console=True,
 )
