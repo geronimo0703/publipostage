@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Résultat campagne #{{ campaign_id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            color: white;
+        }
+        .badge-secondary { background: #757575; }
+        .badge-primary   { background: #1976d2; }
+        .badge-success   { background: #388e3c; }
+        .badge-danger    { background: #e53935; }
+        .log-box {
+            font-family: monospace;
+            font-size: 13px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 14px 18px;
+            border-radius: 6px;
+            max-height: 520px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+        .log-line      { padding: 1px 0; white-space: pre-wrap; }
+        .log-line.ok   { color: #4ec9b0; }
+        .log-line.err  { color: #f48771; }
+        .log-line.warn { color: #dcdcaa; }
+        .actions { margin-top: 20px; display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>📋 Campagne #{{ campaign_id }}</h1>
+
+    <div id="status-badge" class="badge badge-secondary">⏳ En attente…</div>
+
+    <div class="log-box" id="log-box">
+        <div class="log-line" style="color:#888">Démarrage en cours…</div>
+    </div>
+
+    <div class="actions" id="actions" style="display:none">
+        <a href="/" style="padding:10px 20px;background:#757575;color:white;text-decoration:none;">
+            ← Retour à l'accueil
+        </a>
+        <a id="download-log" href="#"
+        style="padding:10px 20px;background:#1976d2;color:white;text-decoration:none;">
+            💾 Télécharger le log
+        </a>
+    </div>
+
+<script>
+const campaignId = {{ campaign_id }};
+const logBox  = document.getElementById('log-box');
+const badge   = document.getElementById('status-badge');
+const actions = document.getElementById('actions');
+let lastCount = 0;
+
+function classForLine(line) {
+    if (line.includes('❌')) return 'err';
+    if (line.includes('✅')) return 'ok';
+    if (line.includes('⚠️')) return 'warn';
+    return '';
+}
+
+function renderLines(lines) {
+    const newLines = lines.slice(lastCount);
+    if (lastCount === 0) logBox.innerHTML = '';
+    newLines.forEach(line => {
+        const div = document.createElement('div');
+        div.className = 'log-line ' + classForLine(line);
+        div.textContent = line;
+        logBox.appendChild(div);
+    });
+    lastCount = lines.length;
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+function updateBadge(status) {
+    const map = {
+        'En attente': ['badge-secondary', '⏳ En attente'],
+        'En cours':   ['badge-primary',   '⚙️ En cours…'],
+        'Terminé':    ['badge-success',   '✅ Terminé'],
+        'Erreur':     ['badge-danger',    '❌ Erreur'],
+    };
+    const [cls, label] = map[status] || ['badge-secondary', status];
+    badge.className = 'badge ' + cls;
+    badge.textContent = label;
+}
+
+async function poll() {
+    try {
+        const r    = await fetch('/logs/' + campaignId);
+        const data = await r.json();
+        renderLines(data.logs || []);
+        updateBadge(data.status);
+
+        if (data.status === 'Terminé' || data.status === 'Erreur') {
+            document.getElementById('download-log').href = '/campaign/' + campaignId + '/download-log';
+            actions.style.display = 'flex';
+            return;
+        }
+    } catch (e) {
+        console.warn('Poll error', e);
+    }
+    setTimeout(poll, 1500);
+}
+
+poll();
+</script>
+
+</body>
+</html>
+EOF

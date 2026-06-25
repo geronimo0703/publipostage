@@ -238,7 +238,7 @@ def upload_files():
         daemon=True,
     ).start()
 
-    return redirect(url_for('index'))
+    return redirect(url_for('campaign_result', campaign_id=campaign_id))
 
 def _update_campaign(campaign_id, statut, logs_lines):
     conn = sqlite3.connect(str(DB_PATH))
@@ -359,6 +359,29 @@ def preview_pdf():
     if not pdf_path or not Path(pdf_path).exists():
         return "PDF non disponible", 404
     return send_file(pdf_path, mimetype='application/pdf')
+
+@app.route('/campaign/<int:campaign_id>')
+def campaign_result(campaign_id):
+    return render_template('campaign_result.html', campaign_id=campaign_id)
+
+@app.route('/campaign/<int:campaign_id>/download-log')
+def download_log(campaign_id):
+    conn = sqlite3.connect(str(DB_PATH))
+    c = conn.cursor()
+    c.execute(f'SELECT logs FROM {DB_TABLE} WHERE id = ?', (campaign_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return "Campagne introuvable", 404
+
+    from flask import Response
+    content = row[0] or ""
+    filename = f"log_campagne_{campaign_id}.txt"
+    return Response(
+        content,
+        mimetype="text/plain",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 def open_browser():
     webbrowser.open("http://127.0.0.1:5000")
