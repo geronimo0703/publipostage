@@ -29,6 +29,7 @@
         .upload-message { font-size: 14px; margin-left: 5px; }
         .upload-message.success { color: green; }
         .upload-message.error { color: red; }
+        .form-hint { font-size: 13px; color: #666; margin: 2px 0 0 0; }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -62,6 +63,8 @@
     </div>
 
     <form action="/preview" method="post" id="campaign-form">
+
+        <!-- Fichier CSV -->
         <div class="form-group">
             <label for="csv">Fichier CSV :</label>
             <select name="csv" id="csv" required>
@@ -69,13 +72,15 @@
             </select>
         </div>
 
+        <!-- Template DOCX — optionnel -->
         <div class="form-group">
             <label for="docx">Template DOCX (fiche PS) :</label>
-            <select name="docx" id="docx" required>
-                <option value="" disabled selected>Sélectionnez un template DOCX</option>
+            <select name="docx" id="docx">
+                <option value="">— Sans pièce jointe —</option>
             </select>
         </div>
 
+        <!-- Envoi des emails -->
         <div class="form-group">
             <label class="checkbox">
                 <input type="checkbox" name="send_emails" id="send_emails" {% if default_send_emails %}checked{% endif %}>
@@ -83,6 +88,7 @@
             </label>
         </div>
 
+        <!-- Options email — masquées si envoi désactivé -->
         <div id="email-options">
             <div class="form-group">
                 <label for="email_template">Modèle email :</label>
@@ -91,6 +97,7 @@
                 </select>
             </div>
         </div>
+
         <div class="form-actions">
             <button type="submit" formaction="/preview">👁️ Prévisualiser</button>
             <button type="submit" formaction="/upload">🚀 Lancer directement</button>
@@ -117,9 +124,17 @@
         document.addEventListener('DOMContentLoaded', function () {
             let currentCampaignId = null;
 
+            // ---- Remplissage des listes déroulantes ----
+
             function fillSelect(selectEl, files, emptyLabel) {
                 selectEl.innerHTML = '';
-                if (files.length === 0) {
+                if (selectEl.id === 'docx') {
+                    // Option "Sans pièce jointe" uniquement pour le template DOCX
+                    const noneOpt = document.createElement('option');
+                    noneOpt.value = '';
+                    noneOpt.textContent = '— Sans pièce jointe —';
+                    selectEl.appendChild(noneOpt);
+                } else if (files.length === 0) {
                     selectEl.innerHTML = `<option value="" disabled selected>${emptyLabel}</option>`;
                     return;
                 }
@@ -152,7 +167,6 @@
             function loadEmailTemplateList() {
                 loadList('/list/email_templates', document.getElementById('email_template'), 'Aucun modèle email trouvé');
             }
-            // Exposées globalement pour les boutons "Importer"
             window.loadCsvList = loadCsvList;
             window.loadTemplateList = loadTemplateList;
             window.loadEmailTemplateList = loadEmailTemplateList;
@@ -161,16 +175,21 @@
             loadTemplateList();
             loadEmailTemplateList();
 
+            // ---- Affichage conditionnel : options email ----
+
             const sendEmailsCheckbox = document.getElementById('send_emails');
             const emailOptions = document.getElementById('email-options');
             const emailTemplateSelect = document.getElementById('email_template');
 
             function toggleEmailOptions() {
-                emailOptions.style.display = sendEmailsCheckbox.checked ? 'block' : 'none';
-                emailTemplateSelect.required = sendEmailsCheckbox.checked;
+                const show = sendEmailsCheckbox.checked;
+                emailOptions.style.display = show ? 'block' : 'none';
+                emailTemplateSelect.required = show;
             }
             sendEmailsCheckbox.addEventListener('change', toggleEmailOptions);
             toggleEmailOptions();
+
+            // ---- Logs temps réel ----
 
             function updateLogs() {
                 if (!currentCampaignId) return;
@@ -183,6 +202,8 @@
                     })
                     .catch(err => console.error('Erreur :', err));
             }
+
+            // ---- Historique ----
 
             function loadHistory() {
                 fetch('/history')
@@ -220,6 +241,8 @@
             setInterval(updateLogs, 2000);
             loadHistory();
         });
+
+        // ---- Upload de fichiers ----
 
         async function uploadFile(inputId, endpoint, messageElSuffix, refreshFn) {
             const input = document.getElementById(inputId);

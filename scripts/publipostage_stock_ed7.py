@@ -22,6 +22,8 @@
 #       : Pour le fichier .csv, possibilité d'avoir un .xslx à la place
 #         => tester le fichier avec pd.read_csv
 #       : pour le message, accepter .html ou .docx
+#       : template_path (.docx document) rendu optionnel : si absent,
+#         aucun PDF n'est généré ni joint à l'email (mail seul).
 # ==============================================================================
 
 import argparse
@@ -79,7 +81,6 @@ def lire_modele_email(chemin_fichier: Path, data=None, personnaliser=False, log=
         with open(chemin_fichier, "rb") as f:
             result = mammoth.convert_to_html(f)
         contenu = result.value
-        #log(f"🔍 mammoth output : {contenu[:200]}")
         if result.messages:
             for msg in result.messages:
                 log(f"⚠️ mammoth : {msg}")
@@ -131,12 +132,17 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
     msg["Subject"] = subject
     msg.attach(MIMEText(corps, "html"))
 
-    with open(pdf_path, "rb") as f:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", f"attachment; filename={pdf_path.name}")
-        msg.attach(part)
+    # Pièce jointe PDF : uniquement si un chemin valide est fourni
+    if pdf_path and Path(pdf_path).exists():
+        with open(pdf_path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f"attachment; filename={Path(pdf_path).name}")
+            msg.attach(part)
+        log(f"📎 Pièce jointe : {Path(pdf_path).name}")
+    else:
+        log("📧 Envoi sans pièce jointe")
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:
@@ -156,10 +162,10 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
 
 def run_publipostage(
     csv_path: Path,
-    template_path: Path,
-    pdf_dir: Path,
-    doc_dir: Path,
-    logs_dir: Path,
+    template_path: Path = None,       # ← optionnel : None = pas de PDF joint
+    pdf_dir: Path = None,
+    doc_dir: Path = None,
+    logs_dir: Path = None,
     send_emails: bool = False,
     personalize: bool = False,
     email_template_path: Path = None,
@@ -172,8 +178,11 @@ def run_publipostage(
 ):
     """
     Exécute le traitement complet : génère les fiches docx/pdf à partir du
-    CSV et du template, envoie les emails si demandé, met à jour le CSV
-    avec les statuts.
+    CSV et du template (si fourni), envoie les emails si demandé, met à
+    jour le CSV avec les statuts.
+
+    template_path est optionnel : s'il est None, aucun document PDF n'est
+    généré ni joint à l'email (mail personnalisé seul).
 
     Ne lève pas d'exception pour les erreurs "métier" (ligne en échec,
     email manquant...) : celles-ci sont juste loguées et le traitement
@@ -186,18 +195,20 @@ def run_publipostage(
             "success": bool,       # False si une erreur fatale a stoppé le traitement
             "logs": [str, ...],    # toutes les lignes de log produites
             "log_file": str,       # chemin du fichier log généré
+            "previews": [...],     # aperçus dry_run
+            "preview_pdf": str,    # chemin du PDF de prévisualisation (ou None)
         }
     """
     csv_path = Path(csv_path)
-    template_path = Path(template_path)
-    pdf_dir = Path(pdf_dir)
-    doc_dir = Path(doc_dir)
+    template_path = Path(template_path) if template_path else None
+    pdf_dir = Path(pdf_dir) if pdf_dir else None
+    doc_dir = Path(doc_dir) if doc_dir else None
     logs_dir = Path(logs_dir)
     email_template_path = Path(email_template_path) if email_template_path else None
     previews = []
     preview_pdf_path = None
 
-    for d in (pdf_dir, doc_dir, logs_dir):
+    for d in filter(None, (pdf_dir, doc_dir, logs_dir)):
         d.mkdir(parents=True, exist_ok=True)
 
     smtp_config = {
@@ -219,13 +230,15 @@ def run_publipostage(
         log_file_handle.flush()
 
     try:
-        log(f"Template .docx utilisé : {template_path}")
+        log(f"Template .docx utilisé : {template_path or '(aucun — mail sans pièce jointe)'}")
         log(f"Fichier .csv utilisé : {csv_path}")
-        log(f"Dossier de sortie .docx : {doc_dir}")
-        log(f"Dossier de sortie .pdf  : {pdf_dir}")
+        if template_path:
+            log(f"Dossier de sortie .docx : {doc_dir}")
+            log(f"Dossier de sortie .pdf  : {pdf_dir}")
         log(f"Envoi des emails : {send_emails}")
         log(f"Personnalisation : {personalize}")
         log(f"Modèle email : {email_template_path}\n")
+
         # Lecture CSV ou Excel selon l'extension
         suffix = Path(csv_path).suffix.lower()
         if suffix == '.xlsx':
@@ -233,7 +246,6 @@ def run_publipostage(
                 df = pd.read_excel(csv_path, sheet_name=0, engine='openpyxl')
                 log("=== COLONNES DU FICHIER EXCEL (feuille 1) ===")
             except Exception:
-                # Fichier .xlsx qui est en réalité un CSV renommé
                 df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
                 log("⚠️  Fichier .xlsx détecté comme CSV — privilégiez un vrai export Excel.")
                 log("=== COLONNES DU FICHIER (détecté comme CSV) ===")
@@ -242,7 +254,6 @@ def run_publipostage(
                 df = pd.read_excel(csv_path, sheet_name=0, engine='xlrd')
                 log("=== COLONNES DU FICHIER EXCEL ancien format (feuille 1) ===")
             except Exception:
-                # Fichier .xls qui est en réalité un CSV renommé
                 df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
                 log("⚠️  Format .xls détecté — privilégiez .xlsx pour éviter les erreurs de compatibilité.")
                 log("=== COLONNES DU FICHIER EXCEL ancien format (feuille 1) ===")
@@ -251,10 +262,6 @@ def run_publipostage(
             log("=== COLONNES DU CSV ===")
         log(str(df.columns.tolist()))
 
-        # On force le type "object" (et pas seulement la création de la
-        # colonne) car un CSV avec une colonne déjà présente mais vide sur
-        # toutes les lignes est lu par pandas en float64 (NaN). Écrire une
-        # chaîne dans une colonne float64 lève une erreur avec pandas 2.x.
         for col in ("Statut", "Date_envoi"):
             if col not in df.columns:
                 df[col] = ""
@@ -269,7 +276,7 @@ def run_publipostage(
                 df.at[index, "Statut"] = "Erreur: Nom_fichier manquant"
                 continue
 
-            # ajout d'un dry_run
+            # --- Mode dry_run (prévisualisation) ---
             if dry_run:
                 email_preview = lire_modele_email(
                     email_template_path, data=data,
@@ -282,8 +289,8 @@ def run_publipostage(
                     "apercu": email_preview if email_preview else "—",
                 })
 
-                # Générer le PDF uniquement pour la première ligne valide
-                if preview_pdf_path is None:
+                # Générer le PDF de prévisualisation uniquement si un template est fourni
+                if preview_pdf_path is None and template_path:
                     doc = Document(template_path)
                     for paragraph in doc.paragraphs:
                         for key, value in data.items():
@@ -306,44 +313,53 @@ def run_publipostage(
                     doc.save(preview_docx)
                     preview_pdf = pdf_dir / f"_preview_{data['Nom_fichier']}.pdf"
                     convert_docx_to_pdf(preview_docx, preview_pdf, log=log)
-                    preview_docx.unlink(missing_ok=True)   # on garde pas le docx
+                    preview_docx.unlink(missing_ok=True)
                     if preview_pdf.exists():
                         preview_pdf_path = preview_pdf
-# #
+
                 continue
 
-            doc = Document(template_path)
+            # --- Mode normal ---
 
-            for paragraph in doc.paragraphs:
-                for key, value in data.items():
-                    if pd.notna(value):
-                        clean_value = str(value).strip().replace('\n', ' ').replace('\r', '')
-                        placeholder = f"{{{{{key}}}}}"
-                        if placeholder in paragraph.text:
-                            paragraph.text = paragraph.text.replace(placeholder, clean_value)
+            # Génération docx/PDF uniquement si un template est fourni
+            pdf_to_attach = None
+            if template_path:
+                doc = Document(template_path)
 
-            for table in doc.tables:
-                for trow in table.rows:
-                    for cell in trow.cells:
-                        for paragraph in cell.paragraphs:
-                            for key, value in data.items():
-                                placeholder = f"{{{{{key}}}}}"
-                                if placeholder in paragraph.text:
-                                    paragraph.text = paragraph.text.replace(placeholder, str(value))
-                                else:
-                                    placeholder_with_spaces = f"{{{{ {key} }}}}"
-                                    if placeholder_with_spaces in paragraph.text:
-                                        paragraph.text = paragraph.text.replace(placeholder_with_spaces, str(value))
+                for paragraph in doc.paragraphs:
+                    for key, value in data.items():
+                        if pd.notna(value):
+                            clean_value = str(value).strip().replace('\n', ' ').replace('\r', '')
+                            placeholder = f"{{{{{key}}}}}"
+                            if placeholder in paragraph.text:
+                                paragraph.text = paragraph.text.replace(placeholder, clean_value)
 
-            doc.add_paragraph(f"\nFait à Lannion, le {data['DATE_DU_JOUR']}")
+                for table in doc.tables:
+                    for trow in table.rows:
+                        for cell in trow.cells:
+                            for paragraph in cell.paragraphs:
+                                for key, value in data.items():
+                                    placeholder = f"{{{{{key}}}}}"
+                                    if placeholder in paragraph.text:
+                                        paragraph.text = paragraph.text.replace(placeholder, str(value))
+                                    else:
+                                        placeholder_with_spaces = f"{{{{ {key} }}}}"
+                                        if placeholder_with_spaces in paragraph.text:
+                                            paragraph.text = paragraph.text.replace(placeholder_with_spaces, str(value))
 
-            output_filename = f"fiche_PS_remplie_{data['Nom_fichier']}.docx"
-            output_path = doc_dir / output_filename
-            doc.save(output_path)
-            log(f"Document Word généré pour {data['Nom_fichier']} : {output_path}")
+                doc.add_paragraph(f"\nFait à Lannion, le {data['DATE_DU_JOUR']}")
 
-            pdf_path = pdf_dir / f"fiche_PS_remplie_{data['Nom_fichier']}.pdf"
-            convert_docx_to_pdf(output_path, pdf_path, log=log)
+                output_filename = f"fiche_PS_remplie_{data['Nom_fichier']}.docx"
+                output_path = doc_dir / output_filename
+                doc.save(output_path)
+                log(f"Document Word généré pour {data['Nom_fichier']} : {output_path}")
+
+                pdf_path = pdf_dir / f"fiche_PS_remplie_{data['Nom_fichier']}.pdf"
+                convert_docx_to_pdf(output_path, pdf_path, log=log)
+                pdf_to_attach = pdf_path
+            else:
+                log(f"📧 Pas de document PDF pour {data.get('Nom_fichier', index)} (mode mail seul)")
+
             log(f"✅ Traité : {data['Nom_fichier']}")
 
             if send_emails:
@@ -352,7 +368,9 @@ def run_publipostage(
                 if email_to_raw:
                     subject = data.get("Sujet", "")
                     success, error_msg = send_email(
-                        email_to_raw, subject, pdf_path, email_template_path,
+                        email_to_raw, subject,
+                        pdf_to_attach,           # None si pas de template docx
+                        email_template_path,
                         smtp_config=smtp_config, data=data, personnaliser=personalize, log=log,
                     )
                     df.at[index, "Statut"] = "Envoyé" if success else f"Erreur: {error_msg}"
@@ -371,15 +389,15 @@ def run_publipostage(
         statuts_path = logs_dir / f"statuts_{Path(csv_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(statuts_path, index=False, encoding='utf-8-sig')
         log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
-        log("✨ Tous les documents ont été générés et convertis en PDF.")
+        log("✨ Tous les documents ont été traités.")
 
         return {
-                    "success": True,
-                    "logs": logs,
-                    "log_file": str(log_filename),
-                    "previews": previews,
-                    "preview_pdf": str(preview_pdf_path) if preview_pdf_path else None,
-                }
+            "success": True,
+            "logs": logs,
+            "log_file": str(log_filename),
+            "previews": previews,
+            "preview_pdf": str(preview_pdf_path) if preview_pdf_path else None,
+        }
 
     except Exception as e:
         log(f"❌ Erreur fatale : {e}")
@@ -400,7 +418,7 @@ def parse_args():
         description="Génère les fiches PS (docx + pdf) et envoie les emails associés."
     )
     parser.add_argument("--csv", required=True)
-    parser.add_argument("--template", required=True)
+    parser.add_argument("--template")   # optionnel : pas de PDF si absent
     parser.add_argument("--send-emails", action="store_true")
     parser.add_argument("--personalize", action="store_true")
     parser.add_argument("--email-template")
@@ -424,7 +442,7 @@ def main():
 
     result = run_publipostage(
         csv_path=args.csv,
-        template_path=args.template,
+        template_path=args.template,   # peut être None
         pdf_dir=base_dir / config["paths"]["pdf_dir"],
         doc_dir=base_dir / config["paths"]["doc_dir"],
         logs_dir=base_dir / config["paths"]["logs_dir"],
@@ -443,4 +461,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

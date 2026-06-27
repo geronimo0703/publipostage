@@ -2,7 +2,10 @@
 # app.py
 # Changelog :
 #   ed1 : ajout d'un bouton "exit"
-#   ed1 : ajour d'un help
+#   ed1 : ajout d'un help
+#   ed2 : with_attachment : le template .docx (et le PDF généré) sont
+#          optionnels — si la case est décochée dans le formulaire,
+#          aucun document n'est généré ni joint à l'email.
 #
 # ==============================================================================
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_file
@@ -42,10 +45,6 @@ except FileNotFoundError:
           "L'application ne peut pas démarrer.")
     sys.exit(1)
 
-# scripts/ est maintenant importé comme un module Python (et non plus
-# exécuté en subprocess), indispensable pour fonctionner dans le binaire
-# PyInstaller où aucun interpréteur python3 n'est garanti sur la machine
-# du volontaire.
 sys.path.insert(0, str(RESOURCE_DIR / "scripts"))
 from publipostage_stock_ed7 import run_publipostage  # noqa: E402
 
@@ -55,7 +54,6 @@ app = Flask(
     static_folder=str(RESOURCE_DIR / "static"),
 )
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "publipostage-dev-key")
-#app.run(debug=True, use_reloader=False)
 
 # --------------------------------------------
 # Répertoire des données utilisateur (écriture, persistant)
@@ -73,13 +71,11 @@ DB_TABLE = config["database"]["table_name"]
 DEFAULT_TEMPLATE_NAME = config["default_files"]["template_file"]
 DEFAULT_SEND_EMAILS = config["processing"].get("send_emails_default", False)
 
-# Créer les répertoires nécessaires
 for d in (CSV_DIR, DOC_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent):
     d.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------
-# Identifiants SMTP (.env à côté des données utilisateur persistantes,
-# pour que le volontaire puisse les configurer sans rouvrir le binaire)
+# Identifiants SMTP
 # --------------------------------------------
 load_dotenv(DATA_DIR / ".env", override=True)
 SMTP_USER = os.getenv("SMTP_USER")
@@ -87,7 +83,6 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SMTP_FROM = os.getenv("SMTP_FROM")
 print(f"🔍 SMTP_USER = '{SMTP_USER}'", flush=True)
 print(f"🔍 SMTP_FROM = '{SMTP_FROM}'", flush=True)
-# Diagnostic au démarrage
 if not SMTP_USER or not SMTP_PASSWORD:
     print(f"⚠️  SMTP non configuré — fichier .env attendu ici : {DATA_DIR / '.env'}", flush=True)
 else:
@@ -99,8 +94,6 @@ SMTP_PORT = config.get("email", {}).get("smtp_port", 587)
 def init_db():
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
-    # DB_TABLE vient de notre propre config.yaml local (pas une entrée utilisateur),
-    # on peut donc l'interpoler directement dans le nom de la table.
     c.execute(f'''
         CREATE TABLE IF NOT EXISTS {DB_TABLE} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,11 +113,45 @@ campaign_logs = {}
 
 
 # --------------------------------------------
+# Helpers
+# --------------------------------------------
+
+def _parse_form_params(form):
+    """
+    Extrait et normalise les paramètres communs aux routes /upload et /preview.
+    Retourne un dict prêt à l'emploi.
+    """
+    csv_filename = form.get('csv')
+    send_emails = form.get('send_emails') == 'on'
+    email_template_filename = form.get('email_template') or None
+
+    # docx vide ("— Sans pièce jointe —") = mail sans pièce jointe
+    docx_filename = form.get('docx') or None
+
+    csv_path = CSV_DIR / csv_filename if csv_filename else None
+    docx_path = DOC_TEMPLATES_DIR / docx_filename if docx_filename else None
+    email_template_path = DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+
+    return {
+        "csv_filename": csv_filename,
+        "docx_filename": docx_filename,
+        "send_emails": send_emails,
+        "with_attachment": bool(docx_filename),  # déduit du choix dans la liste
+        "email_template_filename": email_template_filename,
+        "csv_path": csv_path,
+        "docx_path": docx_path,
+        "email_template_path": email_template_path,
+    }
+
+
+# --------------------------------------------
 # Routes
 # --------------------------------------------
+
 @app.route("/help")
 def help_page():
     return render_template("help.html")
+
 
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
@@ -132,12 +159,14 @@ def shutdown():
     os.kill(os.getpid(), signal.SIGTERM)
     return ("", 204)
 
+
 @app.route('/')
 def index():
     return render_template(
         'index.html',
         default_send_emails=DEFAULT_SEND_EMAILS,
     )
+
 
 @app.route('/list/csv')
 def list_csv_files():
@@ -147,10 +176,12 @@ def list_csv_files():
     )
     return jsonify(files)
 
+
 @app.route('/list/templates')
 def list_template_files():
     files = sorted(f.name for f in DOC_TEMPLATES_DIR.glob("*.docx"))
     return jsonify(files)
+
 
 @app.route('/list/email_templates')
 def list_email_templates():
@@ -160,30 +191,26 @@ def list_email_templates():
     )
     return jsonify(files)
 
+
 def _save_uploaded_file(file_storage, target_dir: Path, allowed_extensions):
-    """
-    Sauvegarde un fichier uploadé dans target_dir après vérification de
-    l'extension. Retourne (succès: bool, message: str).
-    """
     if not file_storage or file_storage.filename == "":
         return False, "Aucun fichier sélectionné"
-
     filename = secure_filename(file_storage.filename)
     ext = Path(filename).suffix.lower()
     if ext not in allowed_extensions:
         return False, f"Extension non autorisée ({ext}). Attendu : {', '.join(allowed_extensions)}"
-
     target_dir.mkdir(parents=True, exist_ok=True)
     file_storage.save(target_dir / filename)
     return True, f"Fichier '{filename}' importé avec succès"
 
-# upload_csv_or_excel
+
 @app.route('/upload/csv', methods=['POST'])
 def upload_csv():
     success, message = _save_uploaded_file(
         request.files.get('file'), CSV_DIR, {'.csv', '.xlsx', '.xls'}
     )
     return jsonify({"success": success, "message": message})
+
 
 @app.route('/upload/template', methods=['POST'])
 def upload_template():
@@ -199,34 +226,26 @@ def upload_email_template():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    csv_filename = request.form.get('csv')
-    docx_filename = request.form.get('docx')
-    send_emails = request.form.get('send_emails') == 'on'
-    personalize = True
-    email_template_filename = request.form.get('email_template') or None
+    p = _parse_form_params(request.form)
 
-    if not csv_filename or not docx_filename:
+    if not p["csv_filename"]:
+        return redirect(request.url)
+    if not p["csv_path"].exists():
+        return redirect(request.url)
+    if p["with_attachment"] and (not p["docx_path"] or not p["docx_path"].exists()):
+        return redirect(request.url)
+    if p["send_emails"] and not p["email_template_filename"]:
         return redirect(request.url)
 
-    csv_path = CSV_DIR / csv_filename
-    docx_path = DOC_TEMPLATES_DIR / docx_filename
-
-    if not csv_path.exists() or not docx_path.exists():
-        return redirect(request.url)
-
-    if send_emails and not email_template_filename:
-        return redirect(request.url)
-
-    email_template_path = (
-        DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
-    )
+    # Valeur affichée dans l'historique
+    template_label = p["docx_filename"] or "(mail seul)"
 
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
     c.execute(f'''
         INSERT INTO {DB_TABLE} (date, fichier_csv, template_docx, statut, logs)
         VALUES (?, ?, ?, ?, ?)
-    ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), csv_filename, docx_filename, "En attente", ""))
+    ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), p["csv_filename"], template_label, "En attente", ""))
     campaign_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -234,11 +253,16 @@ def upload_files():
     campaign_logs[campaign_id] = {"status": "En attente", "logs": []}
     threading.Thread(
         target=lancer_campagne,
-        args=(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id),
+        args=(
+            p["csv_path"], p["docx_path"],
+            p["send_emails"], True,
+            p["email_template_path"], campaign_id,
+        ),
         daemon=True,
     ).start()
 
     return redirect(url_for('campaign_result', campaign_id=campaign_id))
+
 
 def _update_campaign(campaign_id, statut, logs_lines):
     conn = sqlite3.connect(str(DB_PATH))
@@ -253,12 +277,13 @@ def _update_campaign(campaign_id, statut, logs_lines):
 
 def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id):
     campaign_logs[campaign_id]["status"] = "En cours"
-    _update_campaign(campaign_id, "En cours", [f"Début du traitement : {csv_path.name}, {docx_path.name}"])
+    label = docx_path.name if docx_path else "mail seul"
+    _update_campaign(campaign_id, "En cours", [f"Début du traitement : {csv_path.name}, {label}"])
 
     try:
         result = run_publipostage(
             csv_path=csv_path,
-            template_path=docx_path,
+            template_path=docx_path,        # None = mail sans pièce jointe
             pdf_dir=PDF_DIR,
             doc_dir=DOC_DIR,
             logs_dir=LOGS_DIR,
@@ -301,7 +326,6 @@ def get_logs(campaign_id):
 def history():
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
-    # Sélectionner uniquement les 3 dernières campagnes
     c.execute(f'SELECT * FROM {DB_TABLE} ORDER BY date DESC LIMIT 3')
     campagnes = c.fetchall()
     conn.close()
@@ -313,26 +337,20 @@ def history():
         "statut": row[4]
     } for row in campagnes])
 
+
 @app.route('/preview', methods=['POST'])
 def preview():
-    csv_filename = request.form.get('csv')
-    docx_filename = request.form.get('docx')
-    send_emails = request.form.get('send_emails') == 'on'
-    email_template_filename = request.form.get('email_template') or None
-
-    csv_path = CSV_DIR / csv_filename
-    docx_path = DOC_TEMPLATES_DIR / docx_filename
-    email_template_path = DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+    p = _parse_form_params(request.form)
 
     result = run_publipostage(
-        csv_path=csv_path,
-        template_path=docx_path,
+        csv_path=p["csv_path"],
+        template_path=p["docx_path"],       # None si pas de pièce jointe
         pdf_dir=PDF_DIR,
         doc_dir=DOC_DIR,
         logs_dir=LOGS_DIR,
-        send_emails=send_emails,
+        send_emails=p["send_emails"],
         personalize=True,
-        email_template_path=email_template_path,
+        email_template_path=p["email_template_path"],
         smtp_user=SMTP_USER,
         smtp_password=SMTP_PASSWORD,
         smtp_server=SMTP_SERVER,
@@ -341,14 +359,13 @@ def preview():
         dry_run=True,
     )
 
-    # Stocker le chemin du PDF en session pour le servir ensuite
     session['preview_pdf'] = result.get("preview_pdf")
 
     return render_template(
         'preview.html',
         previews=result.get("previews", []),
         form=request.form,
-        send_emails=send_emails,
+        send_emails=p["send_emails"],
         has_pdf=bool(result.get("preview_pdf")),
     )
 
@@ -360,9 +377,11 @@ def preview_pdf():
         return "PDF non disponible", 404
     return send_file(pdf_path, mimetype='application/pdf')
 
+
 @app.route('/campaign/<int:campaign_id>')
 def campaign_result(campaign_id):
     return render_template('campaign_result.html', campaign_id=campaign_id)
+
 
 @app.route('/campaign/<int:campaign_id>/download-log')
 def download_log(campaign_id):
@@ -383,11 +402,13 @@ def download_log(campaign_id):
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+
 def open_browser():
     webbrowser.open("http://127.0.0.1:5000")
 
+
 if __name__ == '__main__':
-    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    debug_mode = True #os.getenv("FLASK_DEBUG", "0") == "1"
 
     if not os.environ.get("WERKZEUG_RUN_MAIN"):
         threading.Timer(1.0, open_browser).start()
