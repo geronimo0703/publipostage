@@ -3,278 +3,796 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Outil de Publipostage</title>
+    <title>Publipostage — Banque Alimentaire 22</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-        h1, h2, h3 { color: #333; }
-        .form-group { margin-bottom: 15px; }
-        select { margin-bottom: 10px; display: block; }
-        label.checkbox { display: flex; align-items: center; gap: 8px; }
-        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #45a049; }
-        #logs { margin-top: 20px; padding: 10px; background-color: #f4f4f4; border: 1px solid #ddd; height: 200px; overflow-y: scroll; font-family: monospace; white-space: pre-wrap; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .status-en-cours { color: orange; }
-        .status-termine { color: green; }
-        .status-erreur { color: red; }
-        #email-options { margin-left: 20px; padding-left: 10px; border-left: 2px solid #ddd; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .upload-section { margin-bottom: 25px; padding: 15px; background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; }
-        .upload-zone { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-        .upload-zone label { min-width: 220px; font-weight: bold; }
-        .upload-zone button { background-color: #2196F3; padding: 8px 14px; font-size: 14px; }
-        .upload-zone button:hover { background-color: #1976D2; }
-        .upload-message { font-size: 14px; margin-left: 5px; }
-        .upload-message.success { color: green; }
-        .upload-message.error { color: red; }
-        .form-hint { font-size: 13px; color: #666; margin: 2px 0 0 0; }
+        :root {
+            --ink:      #1e293b;
+            --ink2:     #475569;
+            --ink3:     #94a3b8;
+            --surf:     #e8edf2;
+            --card:     #ffffff;
+            --border-c: #c8d3de;
+            --border-h: #a8b8c8;
+            --accent:   #d05a2d;
+            --accent-l: #fdf0eb;
+            --blue:     #2563eb;
+            --blue-l:   #eff6ff;
+            --green:    #16a34a;
+            --green-l:  #f0fdf4;
+            --red:      #dc2626;
+            --red-l:    #fef2f2;
+            --amber-l:  #fffbeb;
+            --amber:    #d97706;
+            --r-sm:     6px;
+            --r:        10px;
+            --r-lg:     14px;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--surf);
+            color: var(--ink);
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .app {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 1.75rem 1.25rem 4rem;
+        }
+
+        /* ── Top bar ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 2rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+        }
+        .logo-mark {
+            width: 38px; height: 38px;
+            border-radius: 9px;
+            background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .logo-mark svg { display: block; }
+        .app-title { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -.3px; }
+        .app-sub   { font-size: 13px; color: var(--ink3); margin-top: 1px; }
+        .topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+        .btn-ghost {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px;
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 13px; color: var(--ink2);
+            background: var(--card);
+            cursor: pointer; text-decoration: none;
+            transition: border-color .15s, background .15s;
+        }
+        .btn-ghost:hover { border-color: var(--border-h); background: var(--surf); }
+        .btn-ghost svg { flex-shrink: 0; }
+
+        /* ── Section ── */
+        section { margin-bottom: 1.75rem; }
+        .section-label {
+            font-size: 12px; font-weight: 700;
+            letter-spacing: .04em; color: var(--ink2);
+            text-transform: uppercase;
+            margin-bottom: .75rem;
+        }
+
+        /* ── Upload rows ── */
+        .upload-grid { display: grid; gap: .5rem; }
+        .upload-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px;
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r);
+            transition: border-color .15s;
+        }
+        .upload-row:hover { border-color: var(--border-h); }
+        .upload-icon {
+            width: 34px; height: 34px;
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .upload-icon.csv   { background: var(--blue-l);   color: var(--blue); }
+        .upload-icon.docx  { background: var(--green-l);  color: var(--green); }
+        .upload-icon.email { background: var(--accent-l); color: var(--accent); }
+        .upload-meta { flex: 1; min-width: 0; }
+        .upload-name { font-size: 14px; font-weight: 500; color: var(--ink); }
+        .upload-hint { font-size: 12px; color: var(--ink3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .upload-btn-wrap { position: relative; overflow: hidden; display: inline-flex; }
+        .upload-btn-wrap input[type="file"] {
+            position: absolute; inset: 0;
+            opacity: 0; cursor: pointer; width: 100%;
+        }
+        .upload-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 11px;
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 12px; font-weight: 500; color: var(--ink2);
+            background: var(--surf);
+            cursor: pointer; white-space: nowrap;
+            transition: border-color .15s, color .15s;
+            pointer-events: none;
+        }
+        .upload-btn-wrap:hover .upload-btn { border-color: var(--border-h); color: var(--ink); }
+        .upload-import-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 11px;
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 12px; font-weight: 500; color: var(--ink2);
+            background: var(--surf);
+            cursor: pointer; white-space: nowrap;
+            transition: border-color .15s, color .15s;
+        }
+        .upload-import-btn:hover { border-color: var(--border-h); color: var(--ink); }
+        .upload-msg { font-size: 12px; min-width: 80px; text-align: right; color: var(--ink3); }
+        .upload-msg.success { color: var(--green); }
+        .upload-msg.error   { color: var(--red); }
+
+        /* ── Form card ── */
+        .form-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-lg);
+            padding: 1.25rem;
+            display: grid;
+            gap: 1.125rem;
+        }
+        .field-label {
+            font-size: 13px; font-weight: 500; color: var(--ink2);
+            margin-bottom: .375rem;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .field-label svg { flex-shrink: 0; color: var(--ink3); }
+        .select-wrap { position: relative; }
+        .select-wrap::after {
+            content: '';
+            position: absolute; right: 11px; top: 50%;
+            transform: translateY(-50%);
+            width: 0; height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 5px solid var(--ink3);
+            pointer-events: none;
+        }
+        select {
+            width: 100%;
+            padding: 8px 32px 8px 10px;
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 14px; color: var(--ink);
+            background: #fff;
+            appearance: none;
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        select:focus {
+            outline: none;
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
+        .field-hint { font-size: 12px; color: var(--amber); margin-top: 5px; display: flex; align-items: flex-start; gap: 5px; }
+        .field-hint svg { flex-shrink: 0; margin-top: 1px; }
+
+        /* ── Toggle ── */
+        .toggle-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px;
+            background: var(--surf);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+        }
+        .toggle-label { flex: 1; font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+        .toggle-label svg { color: var(--ink3); }
+        .toggle-switch {
+            width: 38px; height: 22px;
+            background: #cbd5e1;
+            border-radius: 11px;
+            position: relative;
+            cursor: pointer;
+            transition: background .2s;
+            flex-shrink: 0;
+            border: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+        .toggle-switch:checked { background: var(--blue); }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px; left: 3px;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform .2s;
+        }
+        .toggle-switch:checked::after { transform: translateX(16px); }
+        .toggle-switch:focus { outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+
+        .email-sub {
+            padding-left: 1rem;
+            border-left: 2px solid var(--border-c);
+            margin-top: .625rem;
+        }
+
+        /* ── Action buttons ── */
+        .actions-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .5rem; margin-top: .25rem; }
+        .btn-action {
+            display: flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 10px 8px;
+            border-radius: var(--r-sm);
+            font-size: 14px; font-weight: 500;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+        }
+        .btn-action svg { flex-shrink: 0; }
+        .btn-preview {
+            border: 1px solid var(--border-c);
+            color: var(--ink2);
+            background: var(--card);
+        }
+        .btn-preview:hover { border-color: var(--border-h); background: var(--surf); }
+        .btn-launch {
+            border: none;
+            color: #fff;
+            background: var(--accent);
+            font-weight: 600;
+        }
+        .btn-launch:hover { background: #b94d22; }
+        .btn-exit {
+            border: 1px solid var(--border-c);
+            color: var(--ink3);
+            background: var(--card);
+        }
+        .btn-exit:hover { border-color: var(--border-h); color: var(--ink2); }
+
+        /* ── History ── */
+        .history-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-lg);
+            overflow: hidden;
+        }
+        .history-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .875rem 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+        }
+        .history-head-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .history-empty { padding: 2rem 1.25rem; text-align: center; color: var(--ink3); font-size: 13px; }
+        #history-table { width: 100%; border-collapse: collapse; }
+        #history-table th {
+            text-align: left;
+            font-size: 11px; font-weight: 600;
+            letter-spacing: .05em; color: var(--ink3);
+            text-transform: uppercase;
+            padding: .625rem 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+            background: var(--surf);
+        }
+        #history-table td {
+            padding: .75rem 1.25rem;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-c);
+            color: var(--ink2);
+        }
+        #history-table tbody tr:last-child td { border-bottom: none; }
+        #history-table tbody tr:hover td { background: var(--surf); }
+        .badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px; font-weight: 600;
+        }
+        .badge-ok      { background: var(--green-l); color: #15803d; }
+        .badge-running { background: var(--blue-l);  color: var(--blue); }
+        .badge-error   { background: var(--red-l);   color: var(--red); }
+
+        /* status classes used by JS */
+        .status-termine { color: var(--green); font-weight: 500; }
+        .status-en-cours { color: var(--blue); font-weight: 500; }
+        .status-erreur  { color: var(--red);   font-weight: 500; }
+
+        .log-btn {
+            padding: 3px 9px;
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 11px; color: var(--ink3);
+            background: none; cursor: pointer;
+            transition: border-color .15s, color .15s;
+        }
+        .log-btn:hover { border-color: var(--border-h); color: var(--ink2); }
+
+        /* ── Logs ── */
+        .logs-card {
+            background: #0f172a;
+            border-radius: var(--r-lg);
+            overflow: hidden;
+        }
+        .logs-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: .75rem 1.125rem;
+            border-bottom: 1px solid #1e293b;
+        }
+        .logs-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            flex-shrink: 0;
+            transition: background .3s;
+        }
+        .logs-dot.live { background: #22c55e; animation: pulse 1.5s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+        .logs-title { font-size: 12px; color: #64748b; font-family: monospace; }
+        #logs {
+            padding: .875rem 1.125rem;
+            font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.7;
+            height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        /* scrollbar */
+        #logs::-webkit-scrollbar { width: 6px; }
+        #logs::-webkit-scrollbar-track { background: transparent; }
+        #logs::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+
+        /* log coloring via JS classes */
+        .log-info { color: #7dd3fc; }
+        .log-ok   { color: #86efac; }
+        .log-warn { color: #fde68a; }
+        .log-err  { color: #fca5a5; }
     </style>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Outil de Publipostage</h1>
+<div class="app">
 
-    <div class="upload-section">
-        <h2>📁 Importer des fichiers</h2>
-
-        <div class="upload-zone">
-            <label for="csv-file">Fichier CSV ou Excel des bénéficiaires :</label>
-            <input type="file" id="csv-file" accept=".csv,.xlsx,.xls">
-            <button type="button" onclick="uploadFile('csv-file', '/upload/csv', 'csv', loadCsvList)">Importer</button>
-            <p class="form-hint">⚠️ Privilégiez le format <strong>.xlsx</strong> (Excel ou LibreOffice Calc). Le format .xls ancien peut provoquer des erreurs.</p>
-            <span class="upload-message" id="csv-upload-message"></span>
+    <!-- ── Top bar ── -->
+    <div class="topbar">
+        <div class="logo-mark">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 3h2m4 0h-2m-2-2v2m0 2v2"/>
+            </svg>
         </div>
-
-        <div class="upload-zone">
-            <label for="docx-file">Template de document (.docx) :</label>
-            <input type="file" id="docx-file" accept=".docx">
-            <button type="button" onclick="uploadFile('docx-file', '/upload/template', 'docx', loadTemplateList)">Importer</button>
-            <span class="upload-message" id="docx-upload-message"></span>
+        <div>
+            <div class="app-title">Publipostage</div>
+            <div class="app-sub">Banque Alimentaire 22</div>
         </div>
-
-        <div class="upload-zone">
-            <label for="email-file">Modèle d'email (.html ou .docx) :</label>
-            <input type="file" id="email-file" accept=".html,.docx">
-            <button type="button" onclick="uploadFile('email-file', '/upload/email_template', 'email', loadEmailTemplateList)">Importer</button>
-            <span class="upload-message" id="email-upload-message"></span>
+        <div class="topbar-actions">
+            <a href="{{ url_for('help_page') }}" class="btn-ghost">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+                Aide
+            </a>
+            <button class="btn-ghost"
+                    onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
+                Quitter
+            </button>
         </div>
     </div>
 
-    <form action="/preview" method="post" id="campaign-form">
+    <!-- ── Import ── -->
+    <section>
+        <div class="section-label">Importer des fichiers</div>
+        <div class="upload-grid">
 
-        <!-- Fichier CSV -->
-        <div class="form-group">
-            <label for="csv">Fichier CSV :</label>
-            <select name="csv" id="csv" required>
-                <option value="" disabled selected>Sélectionnez un fichier CSV</option>
-            </select>
-        </div>
-
-        <!-- Template DOCX — optionnel -->
-        <div class="form-group">
-            <label for="docx">Template DOCX (fiche PS) :</label>
-            <select name="docx" id="docx">
-                <option value="">— Sans pièce jointe —</option>
-            </select>
-        </div>
-
-        <!-- Envoi des emails -->
-        <div class="form-group">
-            <label class="checkbox">
-                <input type="checkbox" name="send_emails" id="send_emails" {% if default_send_emails %}checked{% endif %}>
-                Envoyer les emails maintenant
-            </label>
-        </div>
-
-        <!-- Options email — masquées si envoi désactivé -->
-        <div id="email-options">
-            <div class="form-group">
-                <label for="email_template">Modèle email :</label>
-                <select name="email_template" id="email_template">
-                    <option value="" disabled selected>Sélectionnez un modèle email</option>
-                </select>
+            <div class="upload-row">
+                <div class="upload-icon csv">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+                </div>
+                <div class="upload-meta">
+                    <div class="upload-name">Bénéficiaires</div>
+                    <div class="upload-hint">CSV ou Excel — <strong>.xlsx recommandé</strong> (.xls ancien peut provoquer des erreurs)</div>
+                </div>
+                <div class="upload-btn-wrap">
+                    <input type="file" id="csv-file" accept=".csv,.xlsx,.xls">
+                    <span class="upload-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Choisir
+                    </span>
+                </div>
+                <button class="upload-import-btn" onclick="uploadFile('csv-file', '/upload/csv', 'csv', loadCsvList)">Importer</button>
+                <span class="upload-msg" id="csv-upload-message">—</span>
             </div>
+
+            <div class="upload-row">
+                <div class="upload-icon docx">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                </div>
+                <div class="upload-meta">
+                    <div class="upload-name">Template document</div>
+                    <div class="upload-hint">Fiche PS — format .docx</div>
+                </div>
+                <div class="upload-btn-wrap">
+                    <input type="file" id="docx-file" accept=".docx">
+                    <span class="upload-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Choisir
+                    </span>
+                </div>
+                <button class="upload-import-btn" onclick="uploadFile('docx-file', '/upload/template', 'docx', loadTemplateList)">Importer</button>
+                <span class="upload-msg" id="docx-upload-message">—</span>
+            </div>
+
+            <div class="upload-row">
+                <div class="upload-icon email">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div class="upload-meta">
+                    <div class="upload-name">Modèle email</div>
+                    <div class="upload-hint">Fichier .html ou .docx</div>
+                </div>
+                <div class="upload-btn-wrap">
+                    <input type="file" id="email-file" accept=".html,.docx">
+                    <span class="upload-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Choisir
+                    </span>
+                </div>
+                <button class="upload-import-btn" onclick="uploadFile('email-file', '/upload/email_template', 'email', loadEmailTemplateList)">Importer</button>
+                <span class="upload-msg" id="email-upload-message">—</span>
+            </div>
+
         </div>
+    </section>
 
-        <div class="form-actions">
-            <button type="submit" formaction="/preview">👁️ Prévisualiser</button>
-            <button type="submit" formaction="/upload">🚀 Lancer directement</button>
-            <button type="button" class="btn-exit"
-                    onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
-                🚪 Quitter
-            </button>
-            <a href="{{ url_for('help_page') }}" class="btn-help">❓ Aide</a>
+    <!-- ── Campaign form ── -->
+    <section>
+        <div class="section-label">Configurer la campagne</div>
+        <form action="/preview" method="post" id="campaign-form">
+            <div class="form-card">
+
+                <!-- CSV -->
+                <div>
+                    <div class="field-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Fichier bénéficiaires
+                    </div>
+                    <div class="select-wrap">
+                        <select name="csv" id="csv" required>
+                            <option value="" disabled selected>Sélectionner un fichier CSV</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- DOCX -->
+                <div>
+                    <div class="field-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6m-3-3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><polyline points="17 0 21 3 17 6"/></svg>
+                        Pièce jointe (optionnel)
+                    </div>
+                    <div class="select-wrap">
+                        <select name="docx" id="docx">
+                            <option value="">— Sans pièce jointe —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Toggle email -->
+                <div>
+                    <div class="toggle-row">
+                        <label class="toggle-label" for="send_emails">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            Envoyer les emails
+                        </label>
+                        <input type="checkbox" class="toggle-switch" name="send_emails" id="send_emails"
+                               {% if default_send_emails %}checked{% endif %}>
+                    </div>
+                    <div id="email-options" class="email-sub" style="margin-top:.75rem">
+                        <div class="field-label" style="font-size:13px;margin-bottom:.375rem">Modèle email</div>
+                        <div class="select-wrap">
+                            <select name="email_template" id="email_template">
+                                <option value="" disabled selected>Sélectionner un modèle</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="actions-row">
+                    <button type="submit" formaction="/preview" class="btn-action btn-preview">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Prévisualiser
+                    </button>
+                    <button type="submit" formaction="/upload" class="btn-action btn-launch">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Lancer
+                    </button>
+                    <button type="button" class="btn-action btn-exit"
+                            onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
+                        Quitter
+                    </button>
+                </div>
+
+            </div>
+        </form>
+    </section>
+
+    <!-- ── History ── -->
+    <section>
+        <div class="section-label">Historique des campagnes</div>
+        <div class="history-card">
+            <div class="history-head">
+                <span class="history-head-title">Campagnes récentes</span>
+                <span id="history-count" style="font-size:12px;color:var(--ink3)"></span>
+            </div>
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Fichier CSV</th>
+                        <th>Template DOCX</th>
+                        <th>Statut</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="5" class="history-empty">Aucune campagne enregistrée.</td></tr>
+                </tbody>
+            </table>
         </div>
-    </form>
+    </section>
 
-    <h2>Historique des campagnes</h2>
-    <table id="history-table">
-        <thead>
-            <tr><th>Date</th><th>Fichier CSV</th><th>Template DOCX</th><th>Statut</th><th>Logs</th></tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+    <!-- ── Fichiers de logs ── -->
+    <section>
+        <div class="section-label">Fichiers exportés</div>
+        <div class="history-card">
+            <div class="history-head">
+                <span class="history-head-title">Logs et statuts</span>
+                <button class="btn-ghost" onclick="loadLogFiles()" style="padding:4px 10px;font-size:12px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-4.36"/></svg>
+                    Rafraîchir
+                </button>
+            </div>
+            <table id="logfiles-table">
+                <thead>
+                    <tr>
+                        <th>Fichier</th>
+                        <th>Type</th>
+                        <th>Taille</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="history-empty">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <h2>Logs en temps réel</h2>
-    <div id="logs">Aucune campagne en cours.</div>
+    <!-- ── Logs ── -->
+    <section>
+        <div class="section-label">Logs en temps réel</div>
+        <div class="logs-card">
+            <div class="logs-header">
+                <div class="logs-dot" id="logs-dot"></div>
+                <div class="logs-title" id="logs-title">console — aucune campagne active</div>
+            </div>
+            <div id="logs">Aucune campagne en cours.</div>
+        </div>
+    </section>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            let currentCampaignId = null;
+</div>
 
-            // ---- Remplissage des listes déroulantes ----
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let currentCampaignId = null;
 
-            function fillSelect(selectEl, files, emptyLabel) {
-                selectEl.innerHTML = '';
-                if (selectEl.id === 'docx') {
-                    // Option "Sans pièce jointe" uniquement pour le template DOCX
-                    const noneOpt = document.createElement('option');
-                    noneOpt.value = '';
-                    noneOpt.textContent = '— Sans pièce jointe —';
-                    selectEl.appendChild(noneOpt);
-                } else if (files.length === 0) {
-                    selectEl.innerHTML = `<option value="" disabled selected>${emptyLabel}</option>`;
+    // ── Selects ──────────────────────────────────────────────
+
+    function fillSelect(selectEl, files, emptyLabel) {
+        selectEl.innerHTML = '';
+        if (selectEl.id === 'docx') {
+            const none = document.createElement('option');
+            none.value = ''; none.textContent = '— Sans pièce jointe —';
+            selectEl.appendChild(none);
+        } else if (files.length === 0) {
+            selectEl.innerHTML = `<option value="" disabled selected>${emptyLabel}</option>`;
+            return;
+        }
+        files.forEach(file => {
+            const opt = document.createElement('option');
+            opt.value = file; opt.textContent = file;
+            selectEl.appendChild(opt);
+        });
+    }
+
+    function loadList(url, selectEl, emptyLabel) {
+        fetch(url)
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+            .then(files => fillSelect(selectEl, files, emptyLabel))
+            .catch(err => {
+                selectEl.innerHTML = `<option value="" disabled selected>Erreur : ${err.message}</option>`;
+            });
+    }
+
+    function loadCsvList()           { loadList('/list/csv',             document.getElementById('csv'),            'Aucun fichier CSV trouvé'); }
+    function loadTemplateList()      { loadList('/list/templates',        document.getElementById('docx'),           'Aucun template DOCX trouvé'); }
+    function loadEmailTemplateList() { loadList('/list/email_templates',  document.getElementById('email_template'), 'Aucun modèle email trouvé'); }
+
+    window.loadCsvList           = loadCsvList;
+    window.loadTemplateList      = loadTemplateList;
+    window.loadEmailTemplateList = loadEmailTemplateList;
+
+    loadCsvList(); loadTemplateList(); loadEmailTemplateList();
+
+    // ── Toggle email options ──────────────────────────────────
+
+    const sendEmailsCb  = document.getElementById('send_emails');
+    const emailOptions  = document.getElementById('email-options');
+    const emailTmplSel  = document.getElementById('email_template');
+
+    function toggleEmailOptions() {
+        const show = sendEmailsCb.checked;
+        emailOptions.style.display  = show ? 'block' : 'none';
+        emailTmplSel.required       = show;
+    }
+    sendEmailsCb.addEventListener('change', toggleEmailOptions);
+    toggleEmailOptions();
+
+    // ── Logs ─────────────────────────────────────────────────
+
+    const logsEl    = document.getElementById('logs');
+    const logsDot   = document.getElementById('logs-dot');
+    const logsTitle = document.getElementById('logs-title');
+
+    function colorLine(line) {
+        if (/erreur|error|failed|échec/i.test(line))  return `<span class="log-err">${line}</span>`;
+        if (/warning|attention|ignoré/i.test(line))   return `<span class="log-warn">${line}</span>`;
+        if (/chargement|début|start/i.test(line))     return `<span class="log-info">${line}</span>`;
+        if (/envoyé|terminé|ok|success/i.test(line))  return `<span class="log-ok">${line}</span>`;
+        return line;
+    }
+
+    function updateLogs() {
+        if (!currentCampaignId) return;
+        fetch(`/logs/${currentCampaignId}`)
+            .then(r => r.json())
+            .then(data => {
+                const running = data.status === 'En cours';
+                logsDot.className   = 'logs-dot' + (running ? ' live' : '');
+                logsTitle.textContent = `campagne #${currentCampaignId} — ${data.status}`;
+                logsEl.innerHTML    = data.logs.map(colorLine).join('\n');
+                logsEl.scrollTop    = logsEl.scrollHeight;
+            })
+            .catch(err => console.error('Logs error:', err));
+    }
+
+    // ── History ───────────────────────────────────────────────
+
+    function statusBadge(statut) {
+        const s = statut.toLowerCase().replace(/\s+/g, '-');
+        if (s === 'termine' || s === 'terminé') return `<span class="badge badge-ok">✓ Terminé</span>`;
+        if (s === 'en-cours')                   return `<span class="badge badge-running">⟳ En cours</span>`;
+        return `<span class="badge badge-error">✕ Erreur</span>`;
+    }
+
+    function loadHistory() {
+        fetch('/history')
+            .then(r => r.json())
+            .then(data => {
+                const tbody = document.querySelector('#history-table tbody');
+                const countEl = document.getElementById('history-count');
+                tbody.innerHTML = '';
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="history-empty">Aucune campagne enregistrée.</td></tr>';
+                    countEl.textContent = '';
                     return;
                 }
-                files.forEach(file => {
-                    const option = document.createElement('option');
-                    option.value = file;
-                    option.textContent = file;
-                    selectEl.appendChild(option);
+
+                countEl.textContent = `${data.length} campagne${data.length > 1 ? 's' : ''}`;
+
+                data.forEach(c => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td style="color:var(--ink3)">${c.date}</td>
+                        <td style="color:var(--ink);font-weight:500">${c.fichier_csv}</td>
+                        <td>${c.template_docx || '—'}</td>
+                        <td>${statusBadge(c.statut)}</td>
+                        <td><button class="log-btn" data-id="${c.id}">Logs</button></td>`;
+                    tbody.appendChild(row);
+                    if (c.statut === 'En cours') currentCampaignId = c.id;
                 });
-            }
 
-            function loadList(url, selectEl, emptyLabel) {
-                fetch(url)
-                    .then(r => {
-                        if (!r.ok) throw new Error(`Erreur HTTP : ${r.status}`);
-                        return r.json();
-                    })
-                    .then(files => fillSelect(selectEl, files, emptyLabel))
-                    .catch(err => {
-                        selectEl.innerHTML = `<option value="" disabled selected>Erreur : ${err.message}</option>`;
+                document.querySelectorAll('.log-btn').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        currentCampaignId = parseInt(this.dataset.id);
+                        updateLogs();
                     });
-            }
+                });
+            })
+            .catch(err => console.error('History error:', err));
+    }
 
-            function loadCsvList() {
-                loadList('/list/csv', document.getElementById('csv'), 'Aucun fichier CSV trouvé');
-            }
-            function loadTemplateList() {
-                loadList('/list/templates', document.getElementById('docx'), 'Aucun template DOCX trouvé');
-            }
-            function loadEmailTemplateList() {
-                loadList('/list/email_templates', document.getElementById('email_template'), 'Aucun modèle email trouvé');
-            }
-            window.loadCsvList = loadCsvList;
-            window.loadTemplateList = loadTemplateList;
-            window.loadEmailTemplateList = loadEmailTemplateList;
+    setInterval(loadHistory, 5000);
+    setInterval(updateLogs, 2000);
+    loadHistory();
 
-            loadCsvList();
-            loadTemplateList();
-            loadEmailTemplateList();
+    // ── Fichiers de logs ──────────────────────────────────────
 
-            // ---- Affichage conditionnel : options email ----
-
-            const sendEmailsCheckbox = document.getElementById('send_emails');
-            const emailOptions = document.getElementById('email-options');
-            const emailTemplateSelect = document.getElementById('email_template');
-
-            function toggleEmailOptions() {
-                const show = sendEmailsCheckbox.checked;
-                emailOptions.style.display = show ? 'block' : 'none';
-                emailTemplateSelect.required = show;
-            }
-            sendEmailsCheckbox.addEventListener('change', toggleEmailOptions);
-            toggleEmailOptions();
-
-            // ---- Logs temps réel ----
-
-            function updateLogs() {
-                if (!currentCampaignId) return;
-                fetch(`/logs/${currentCampaignId}`)
-                    .then(r => r.json())
-                    .then(data => {
-                        const logsDiv = document.getElementById('logs');
-                        const statusClass = data.status.toLowerCase().replace(/\s+/g, '-');
-                        logsDiv.innerHTML = `<p>Statut : <span class="status-${statusClass}">${data.status}</span></p><pre>${data.logs.join('\n')}</pre>`;
-                    })
-                    .catch(err => console.error('Erreur :', err));
-            }
-
-            // ---- Historique ----
-
-            function loadHistory() {
-                fetch('/history')
-                    .then(r => r.json())
-                    .then(data => {
-                        const tableBody = document.querySelector('#history-table tbody');
-                        tableBody.innerHTML = '';
-                        if (data.length === 0) {
-                            tableBody.innerHTML = '<tr><td colspan="5">Aucune campagne enregistrée.</td></tr>';
-                            return;
-                        }
-                        data.forEach(c => {
-                            const statusClass = c.statut.toLowerCase().replace(/\s+/g, '-');
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${c.date}</td>
-                                <td>${c.fichier_csv}</td>
-                                <td>${c.template_docx}</td>
-                                <td class="status-${statusClass}">${c.statut}</td>
-                                <td><button class="view-logs" data-campaign-id="${c.id}">Voir</button></td>`;
-                            tableBody.appendChild(row);
-                            if (c.statut === 'En cours') currentCampaignId = c.id;
-                        });
-                        document.querySelectorAll('.view-logs').forEach(btn => {
-                            btn.addEventListener('click', function () {
-                                currentCampaignId = parseInt(this.dataset.campaignId);
-                                updateLogs();
-                            });
-                        });
-                    })
-                    .catch(err => console.error('Erreur :', err));
-            }
-
-            setInterval(loadHistory, 5000);
-            setInterval(updateLogs, 2000);
-            loadHistory();
-        });
-
-        // ---- Upload de fichiers ----
-
-        async function uploadFile(inputId, endpoint, messageElSuffix, refreshFn) {
-            const input = document.getElementById(inputId);
-            const messageEl = document.getElementById(`${messageElSuffix}-upload-message`);
-
-            if (!input.files.length) {
-                messageEl.textContent = 'Choisis d\'abord un fichier.';
-                messageEl.className = 'upload-message error';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
-            messageEl.textContent = 'Import en cours...';
-            messageEl.className = 'upload-message';
-
-            try {
-                const response = await fetch(endpoint, { method: 'POST', body: formData });
-                const result = await response.json();
-
-                messageEl.textContent = result.message;
-                messageEl.className = 'upload-message ' + (result.success ? 'success' : 'error');
-
-                if (result.success) {
-                    input.value = '';
-                    if (typeof refreshFn === 'function') refreshFn();
+    function loadLogFiles() {
+        fetch('/logs/files')
+            .then(r => r.json())
+            .then(files => {
+                const tbody = document.querySelector('#logfiles-table tbody');
+                if (files.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="history-empty">Aucun fichier disponible.</td></tr>';
+                    return;
                 }
-            } catch (err) {
-                messageEl.textContent = 'Erreur réseau : ' + err.message;
-                messageEl.className = 'upload-message error';
-            }
+                tbody.innerHTML = files.map(f => {
+                    const isCsv = f.name.endsWith('.csv');
+                    const type  = isCsv
+                        ? '<span class="badge badge-ok">CSV</span>'
+                        : '<span class="badge badge-running">TXT</span>';
+                    const size  = f.size < 1024
+                        ? `${f.size} o`
+                        : `${(f.size / 1024).toFixed(1)} Ko`;
+                    return `<tr>
+                        <td style="color:var(--ink);font-weight:500;font-family:monospace;font-size:12px">${f.name}</td>
+                        <td>${type}</td>
+                        <td style="color:var(--ink3)">${size}</td>
+                        <td><a href="/logs/files/${f.name}" class="log-btn" download>Télécharger</a></td>
+                    </tr>`;
+                }).join('');
+            })
+            .catch(() => {
+                document.querySelector('#logfiles-table tbody').innerHTML =
+                    '<tr><td colspan="4" class="history-empty">Erreur de chargement.</td></tr>';
+            });
+    }
+
+    loadLogFiles();
+});
+
+// ── Upload ────────────────────────────────────────────────────
+
+async function uploadFile(inputId, endpoint, msgSuffix, refreshFn) {
+    const input   = document.getElementById(inputId);
+    const msgEl   = document.getElementById(`${msgSuffix}-upload-message`);
+
+    if (!input.files.length) {
+        msgEl.textContent = 'Choisir un fichier d\'abord.';
+        msgEl.className   = 'upload-msg error';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    msgEl.textContent = 'Import…';
+    msgEl.className   = 'upload-msg';
+
+    try {
+        const response = await fetch(endpoint, { method: 'POST', body: formData });
+        const result   = await response.json();
+        msgEl.textContent = result.message;
+        msgEl.className   = 'upload-msg ' + (result.success ? 'success' : 'error');
+        if (result.success) {
+            input.value = '';
+            if (typeof refreshFn === 'function') refreshFn();
         }
-    </script>
+    } catch (err) {
+        msgEl.textContent = 'Erreur réseau';
+        msgEl.className   = 'upload-msg error';
+    }
+}
+</script>
 </body>
 </html>

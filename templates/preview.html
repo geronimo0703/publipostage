@@ -2,63 +2,379 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Prévisualisation</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prévisualisation — Publipostage</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
-        th { background-color: #f2f2f2; }
-        .apercu { font-size: 12px; color: #555; max-width: 400px; }
-        .actions { margin-top: 20px; display: flex; gap: 10px; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --ink:      #1e293b;
+            --ink2:     #475569;
+            --ink3:     #94a3b8;
+            --surf:     #e8edf2;
+            --card:     #ffffff;
+            --border-c: #c8d3de;
+            --border-h: #a8b8c8;
+            --accent:   #d05a2d;
+            --accent-l: #fdf0eb;
+            --blue:     #2563eb;
+            --blue-l:   #eff6ff;
+            --green:    #16a34a;
+            --green-l:  #f0fdf4;
+            --amber:    #d97706;
+            --amber-l:  #fffbeb;
+            --r-sm:     6px;
+            --r:        10px;
+            --r-lg:     14px;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--surf);
+            color: var(--ink);
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .app {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1.75rem 1.25rem 4rem;
+        }
+
+        /* ── Top bar ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 2rem;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+        }
+        .logo-mark {
+            width: 38px; height: 38px;
+            border-radius: 9px;
+            background: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; flex-shrink: 0;
+        }
+        .app-title { font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -.3px; }
+        .app-sub   { font-size: 13px; color: var(--ink3); margin-top: 1px; }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size: 12px; font-weight: 700;
+            letter-spacing: .04em; color: var(--ink2);
+            text-transform: uppercase;
+            margin-bottom: .75rem;
+        }
+
+        section { margin-bottom: 1.75rem; }
+
+        /* ── Warning banner ── */
+        .banner {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: .875rem 1rem;
+            background: var(--amber-l);
+            border: 1px solid #fde68a;
+            border-radius: var(--r);
+            font-size: 13px; color: #92400e;
+            margin-bottom: 1.75rem;
+        }
+        .banner svg { flex-shrink: 0; margin-top: 1px; color: var(--amber); }
+
+        /* ── Stats row ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: .625rem;
+            margin-bottom: 1.75rem;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r);
+            padding: .875rem 1rem;
+        }
+        .stat-label { font-size: 12px; color: var(--ink3); margin-bottom: 3px; }
+        .stat-value { font-size: 22px; font-weight: 600; color: var(--ink); letter-spacing: -.5px; }
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.blue   { color: var(--blue); }
+        .stat-value.green  { color: var(--green); }
+
+        /* ── Table ── */
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-lg);
+            overflow: hidden;
+        }
+        .table-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: .875rem 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+        }
+        .table-head-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .table-head-sub   { font-size: 12px; color: var(--ink3); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left;
+            font-size: 11px; font-weight: 600;
+            letter-spacing: .05em; color: var(--ink3);
+            text-transform: uppercase;
+            padding: .5rem 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+            background: var(--surf);
+            white-space: nowrap;
+        }
+        td {
+            padding: .75rem 1.25rem;
+            font-size: 13px; color: var(--ink2);
+            border-bottom: 1px solid var(--border-c);
+            vertical-align: top;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: #f8fafc; }
+
+        .td-index { color: var(--ink3); font-variant-numeric: tabular-nums; width: 40px; }
+        .td-nom   { font-weight: 500; color: var(--ink); }
+        .td-email { font-family: ui-monospace, monospace; font-size: 12px; }
+        .td-sujet { color: var(--ink); }
+
+        .apercu-cell {
+            max-width: 320px;
+            font-size: 12px;
+            color: var(--ink2);
+            line-height: 1.5;
+        }
+        .apercu-cell * { font-size: 12px !important; }
+
+        /* toggle aperçu */
+        .apercu-toggle {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; color: var(--blue);
+            cursor: pointer; background: none; border: none;
+            padding: 0; margin-top: 4px;
+        }
+        .apercu-toggle:hover { text-decoration: underline; }
+        .apercu-content { margin-top: 6px; display: none; }
+        .apercu-content.open { display: block; }
+
+        /* ── PDF iframe ── */
+        .pdf-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-lg);
+            overflow: hidden;
+        }
+        .pdf-head {
+            display: flex; align-items: center; gap: 10px;
+            padding: .875rem 1.25rem;
+            border-bottom: 1px solid var(--border-c);
+        }
+        .pdf-head-icon {
+            width: 28px; height: 28px;
+            border-radius: 6px;
+            background: var(--accent-l);
+            color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .pdf-head-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .pdf-head-sub   { font-size: 12px; color: var(--ink3); margin-top: 1px; }
+        iframe {
+            display: block;
+            width: 100%; height: 560px;
+            border: none;
+        }
+
+        /* ── Actions ── */
+        .actions-card {
+            background: var(--card);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-lg);
+            padding: 1.25rem;
+            display: flex; align-items: center; gap: .75rem;
+            flex-wrap: wrap;
+        }
+        .actions-info {
+            flex: 1; min-width: 180px;
+        }
+        .actions-info-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .actions-info-sub   { font-size: 13px; color: var(--ink3); margin-top: 2px; }
+
+        .btn-confirm {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: var(--r-sm);
+            font-size: 14px; font-weight: 600;
+            cursor: pointer;
+            transition: background .15s;
+            white-space: nowrap;
+        }
+        .btn-confirm:hover { background: #b94d22; }
+
+        .btn-cancel {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 10px 16px;
+            background: var(--card);
+            color: var(--ink2);
+            border: 1px solid var(--border-c);
+            border-radius: var(--r-sm);
+            font-size: 14px; font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: border-color .15s, background .15s;
+            white-space: nowrap;
+        }
+        .btn-cancel:hover { border-color: var(--border-h); background: var(--surf); }
     </style>
 </head>
 <body>
-    <h1>👁️ Prévisualisation — {{ previews|length }} fiche(s)</h1>
-    <p>⚠️ Aucun document n'a été généré ni email envoyé. Vérifiez ci-dessous avant de confirmer.</p>
+<div class="app">
 
-    <table>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Bénéficiaire</th>
-                <th>Email destinataire</th>
-                <th>Sujet</th>
-                {% if send_emails %}<th>Aperçu email</th>{% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in previews %}
-            <tr>
-                <td>{{ loop.index }}</td>
-                <td>{{ p.nom }}</td>
-                <td>{{ p.email }}</td>
-                <td>{{ p.sujet }}</td>
-                {% if send_emails %}<td class="apercu">{{ p.apercu | safe }}</td>{% endif %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- ── Top bar ── -->
+    <div class="topbar">
+        <div class="logo-mark">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 3h2m4 0h-2m-2-2v2m0 2v2"/>
+            </svg>
+        </div>
+        <div>
+            <div class="app-title">Prévisualisation</div>
+            <div class="app-sub">Banque Alimentaire 22 — vérification avant envoi</div>
+        </div>
+    </div>
+
+    <!-- ── Warning ── -->
+    <div class="banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Aucun document n'a été généré, aucun email envoyé. Vérifiez la liste ci-dessous avant de confirmer le lancement.
+    </div>
+
+    <!-- ── Stats ── -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Fiches à traiter</div>
+            <div class="stat-value accent">{{ previews|length }}</div>
+        </div>
+        {% if send_emails %}
+        <div class="stat-card">
+            <div class="stat-label">Emails à envoyer</div>
+            <div class="stat-value blue">{{ previews|selectattr('email', '!=', '—')|list|length }}</div>
+        </div>
+        {% endif %}
+        {% if has_pdf %}
+        <div class="stat-card">
+            <div class="stat-label">PDF généré</div>
+            <div class="stat-value green">1</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Table des destinataires ── -->
+    <section>
+        <div class="section-label">Liste des destinataires</div>
+        <div class="table-card">
+            <div class="table-head">
+                <div>
+                    <div class="table-head-title">{{ previews|length }} fiche{{ 's' if previews|length > 1 }}</div>
+                    <div class="table-head-sub">Vérifiez les adresses et les sujets avant de lancer</div>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Bénéficiaire</th>
+                        <th>Email destinataire</th>
+                        <th>Sujet</th>
+                        {% if send_emails %}<th>Aperçu email</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in previews %}
+                    <tr>
+                        <td class="td-index">{{ loop.index }}</td>
+                        <td class="td-nom">{{ p.nom }}</td>
+                        <td class="td-email">{{ p.email }}</td>
+                        <td class="td-sujet">{{ p.sujet }}</td>
+                        {% if send_emails %}
+                        <td class="apercu-cell">
+                            {% if p.apercu and p.apercu != '—' %}
+                            <button class="apercu-toggle" onclick="toggleApercu(this)">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                Voir l'aperçu
+                            </button>
+                            <div class="apercu-content">{{ p.apercu | safe }}</div>
+                            {% else %}
+                            <span style="color:var(--ink3);font-size:12px">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── PDF preview ── -->
     {% if has_pdf %}
-    <h2>📄 Aperçu d'une fiche (première ligne)</h2>
-        <iframe src="/preview/pdf" width="100%" height="600px"
-                style="border:1px solid #ddd; border-radius:4px;">
-        </iframe>
+    <section>
+        <div class="section-label">Aperçu du document</div>
+        <div class="pdf-card">
+            <div class="pdf-head">
+                <div class="pdf-head-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <div>
+                    <div class="pdf-head-title">Fiche PDF — première ligne</div>
+                    <div class="pdf-head-sub">Aperçu généré à partir du premier bénéficiaire de la liste</div>
+                </div>
+            </div>
+            <iframe src="/preview/pdf" title="Aperçu PDF"></iframe>
+        </div>
+    </section>
     {% endif %}
 
-    <div class="actions">
-        <!-- Confirmation : reposte les mêmes paramètres vers /upload -->
-        <form action="/upload" method="post">
-            {% for key, value in form.items() %}
-            <input type="hidden" name="{{ key }}" value="{{ value }}">
-            {% endfor %}
-            <button type="submit" style="background:#e53935;color:white;padding:10px 20px;border:none;cursor:pointer;font-size:16px;">
-                ✉️ Confirmer et lancer ({{ previews|length }} fiche{{ 's' if previews|length > 1 }})
-            </button>
-        </form>
-        <a href="/" style="padding:10px 20px;background:#757575;color:white;text-decoration:none;">
-            ← Annuler
-        </a>
-    </div>
+    <!-- ── Actions ── -->
+    <section>
+        <div class="actions-card">
+            <div class="actions-info">
+                <div class="actions-info-title">Tout semble correct ?</div>
+                <div class="actions-info-sub">Le traitement démarrera immédiatement après confirmation.</div>
+            </div>
+            <a href="/" class="btn-cancel">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                Annuler
+            </a>
+            <form action="/upload" method="post" style="display:contents">
+                {% for key, value in form.items() %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <button type="submit" class="btn-confirm">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Confirmer et lancer — {{ previews|length }} fiche{{ 's' if previews|length > 1 }}
+                </button>
+            </form>
+        </div>
+    </section>
+
+</div>
+
+<script>
+function toggleApercu(btn) {
+    const content = btn.nextElementSibling;
+    const open = content.classList.toggle('open');
+    btn.innerHTML = open
+        ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg> Masquer`
+        : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Voir l'aperçu`;
+}
+</script>
 </body>
 </html>

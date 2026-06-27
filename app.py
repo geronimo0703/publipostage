@@ -274,6 +274,12 @@ def _update_campaign(campaign_id, statut, logs_lines):
     conn.commit()
     conn.close()
 
+def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
+    """Supprime les anciens fichiers log_*.txt et statuts_*.csv, ne garde que les `keep` plus récents de chaque."""
+    for pattern in ("log_*.txt", "statuts_*.csv"):
+        files = sorted(logs_dir.glob(pattern), key=lambda f: f.stat().st_mtime)
+        for old in files[:-keep]:
+            old.unlink(missing_ok=True)
 
 def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id):
     campaign_logs[campaign_id]["status"] = "En cours"
@@ -307,6 +313,27 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
         campaign_logs[campaign_id]["logs"] = logs
         _update_campaign(campaign_id, "Erreur", logs)
 
+    finally:                                       # on ne garde que les 3 dernières campagnes
+        _purge_old_logs(LOGS_DIR, keep=3)
+
+@app.route('/logs/files')
+def list_log_files():
+    """Liste les fichiers log_*.txt et statuts_*.csv dans LOGS_DIR."""
+    files = []
+    for pattern in ("log_*.txt", "statuts_*.csv"):
+        for f in sorted(LOGS_DIR.glob(pattern), key=lambda x: x.stat().st_mtime, reverse=True):
+            files.append({"name": f.name, "size": f.stat().st_size})
+    return jsonify(files)
+
+
+@app.route('/logs/files/<filename>')
+def download_log_file(filename):
+    """Télécharge un fichier log ou statuts depuis LOGS_DIR."""
+    safe = secure_filename(filename)
+    path = LOGS_DIR / safe
+    if not path.exists() or not (safe.startswith("log_") or safe.startswith("statuts_")):
+        return "Fichier introuvable", 404
+    return send_file(path, as_attachment=True)
 
 @app.route('/logs/<int:campaign_id>')
 def get_logs(campaign_id):
