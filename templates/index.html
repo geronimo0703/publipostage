@@ -494,12 +494,29 @@
                         <input type="checkbox" class="toggle-switch" name="send_emails" id="send_emails"
                                {% if default_send_emails %}checked{% endif %}>
                     </div>
-                    <div id="email-options" class="email-sub" style="margin-top:.75rem">
-                        <div class="field-label" style="font-size:13px;margin-bottom:.375rem">Modèle email</div>
-                        <div class="select-wrap">
-                            <select name="email_template" id="email_template">
-                                <option value="" disabled selected>Sélectionner un modèle</option>
-                            </select>
+                    <div id="email-options" class="email-sub" style="margin-top:.75rem;display:grid;gap:.75rem">
+                        <div>
+                            <div class="field-label" style="font-size:13px;margin-bottom:.375rem">Modèle email</div>
+                            <div class="select-wrap">
+                                <select name="email_template" id="email_template">
+                                    <option value="" disabled selected>Sélectionner un modèle</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="field-label" style="font-size:13px;margin-bottom:.375rem">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                Votre adresse email (Reply-To)
+                            </div>
+                            <input type="email" name="reply_to" id="reply_to"
+                                   placeholder="votre.email@exemple.fr"
+                                   style="width:100%;padding:8px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:14px;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s;"
+                                   onfocus="this.style.borderColor='#93c5fd';this.style.boxShadow='0 0 0 3px rgba(37,99,235,.1)'"
+                                   onblur="this.style.borderColor='';this.style.boxShadow=''">
+                            <div class="field-hint" style="margin-top:4px">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                Les réponses des destinataires arriveront à cette adresse
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -643,6 +660,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const show = sendEmailsCb.checked;
         emailOptions.style.display  = show ? 'block' : 'none';
         emailTmplSel.required       = show;
+        document.getElementById('reply_to').required = show;
     }
     sendEmailsCb.addEventListener('change', toggleEmailOptions);
     toggleEmailOptions();

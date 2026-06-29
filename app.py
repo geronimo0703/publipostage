@@ -117,6 +117,8 @@ campaign_logs = {}
 # --------------------------------------------
 
 def _parse_form_params(form):
+    print(f"🔍 form.keys() = {list(form.keys())}", flush=True)
+    print(f"🔍 reply_to brut = '{form.get('reply_to')}'", flush=True)
     """
     Extrait et normalise les paramètres communs aux routes /upload et /preview.
     Retourne un dict prêt à l'emploi.
@@ -131,6 +133,7 @@ def _parse_form_params(form):
     csv_path = CSV_DIR / csv_filename if csv_filename else None
     docx_path = DOC_TEMPLATES_DIR / docx_filename if docx_filename else None
     email_template_path = DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+    reply_to = form.get("reply_to") or None
 
     return {
         "csv_filename": csv_filename,
@@ -141,6 +144,7 @@ def _parse_form_params(form):
         "csv_path": csv_path,
         "docx_path": docx_path,
         "email_template_path": email_template_path,
+        "reply_to": reply_to,
     }
 
 
@@ -226,6 +230,7 @@ def upload_email_template():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
+    print(f"🔍 /upload form = {dict(request.form)}", flush=True)
     p = _parse_form_params(request.form)
 
     if not p["csv_filename"]:
@@ -257,6 +262,7 @@ def upload_files():
             p["csv_path"], p["docx_path"],
             p["send_emails"], True,
             p["email_template_path"], campaign_id,
+            p["reply_to"],
         ),
         daemon=True,
     ).start()
@@ -281,7 +287,8 @@ def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
         for old in files[:-keep]:
             old.unlink(missing_ok=True)
 
-def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id):
+def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id,reply_to=None):
+    print(f"🔍 reply_to dans lancer_campagne = '{reply_to}'", flush=True)
     campaign_logs[campaign_id]["status"] = "En cours"
     label = docx_path.name if docx_path else "mail seul"
     _update_campaign(campaign_id, "En cours", [f"Début du traitement : {csv_path.name}, {label}"])
@@ -301,6 +308,7 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
             smtp_server=SMTP_SERVER,
             smtp_port=SMTP_PORT,
             smtp_from=SMTP_FROM,
+            reply_to=reply_to,
         )
         statut = "Terminé" if result["success"] else "Erreur"
         campaign_logs[campaign_id]["status"] = statut
@@ -367,6 +375,7 @@ def history():
 
 @app.route('/preview', methods=['POST'])
 def preview():
+    print(f"🔍 form complet = {dict(request.form)}", flush=True)
     p = _parse_form_params(request.form)
 
     result = run_publipostage(
@@ -383,11 +392,12 @@ def preview():
         smtp_server=SMTP_SERVER,
         smtp_port=SMTP_PORT,
         smtp_from=SMTP_FROM,
+        reply_to=p["reply_to"],
         dry_run=True,
     )
 
     session['preview_pdf'] = result.get("preview_pdf")
-
+    print(f"🔍 form passé au template = {dict(request.form)}", flush=True)
     return render_template(
         'preview.html',
         previews=result.get("previews", []),

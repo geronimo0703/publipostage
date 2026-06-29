@@ -116,6 +116,10 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
         log(f"❌ {msg_err}")
         return False, msg_err
 
+    if data is None:
+        data = {}
+    data["reply_to"] = smtp_config.get("reply_to", "")
+
     corps = lire_modele_email(modele_path, data=data, personnaliser=personnaliser, log=log)
     if corps is None:
         msg_err = f"Modèle introuvable : '{modele_path}'"
@@ -130,6 +134,10 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
     msg["From"] = smtp_from
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
+    reply_to = smtp_config.get("reply_to")
+    print(f"🔍 reply_to dans send_email = '{reply_to}'", flush=True)
+    if reply_to:
+        msg["Reply-To"] = reply_to
     msg.attach(MIMEText(corps, "html"))
 
     # Pièce jointe PDF : uniquement si un chemin valide est fourni
@@ -174,6 +182,7 @@ def run_publipostage(
     smtp_server: str = "smtp.gmail.com",
     smtp_port: int = 587,
     smtp_from: str = None,
+    reply_to: str = None,
     dry_run: bool = False,
 ):
     """
@@ -217,6 +226,7 @@ def run_publipostage(
         "server": smtp_server,
         "port": smtp_port,
         "from": smtp_from or smtp_user,
+        "reply_to": reply_to,
     }
 
     logs = []
@@ -278,6 +288,7 @@ def run_publipostage(
 
             # --- Mode dry_run (prévisualisation) ---
             if dry_run:
+                data["reply_to"] = smtp_config.get("reply_to", "")
                 email_preview = lire_modele_email(
                     email_template_path, data=data,
                     personnaliser=personalize, log=log
