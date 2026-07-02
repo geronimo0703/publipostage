@@ -1,5 +1,12 @@
 # Changelog — Publipostage Banque Alimentaire 22
 
+
+## [v0.2.22] - 2026-07-02
+### Ajouté
+- purge des logs ; on ne conserve que les 5 derniers logs et .csv
+- dans le template .docx, on récupére le reply_to passédans le formulaire
+- traitement du cas ou LibreOffice n'est pas présent
+
 ## [v0.2.21] - 2026-06-30
 ### Ajouté 
 - Ajout message pour réimporter un/des fichier(s) si modifier par le user

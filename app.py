@@ -213,18 +213,25 @@ def upload_csv():
     success, message = _save_uploaded_file(
         request.files.get('file'), CSV_DIR, {'.csv', '.xlsx', '.xls'}
     )
+    if success:
+        _purge_old_uploads(CSV_DIR, ("*.csv", "*.xlsx", "*.xls"), keep=5)
     return jsonify({"success": success, "message": message})
+
 
 
 @app.route('/upload/template', methods=['POST'])
 def upload_template():
     success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.docx'})
+    if success:
+        _purge_old_uploads(DOC_TEMPLATES_DIR, ("*.docx",), keep=5)
     return jsonify({"success": success, "message": message})
 
 
 @app.route('/upload/email_template', methods=['POST'])
 def upload_email_template():
     success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.html', '.docx'})
+    if success:
+        _purge_old_uploads(DOC_TEMPLATES_DIR, ("*.html", "*.docx"), keep=5)
     return jsonify({"success": success, "message": message})
 
 
@@ -279,6 +286,13 @@ def _update_campaign(campaign_id, statut, logs_lines):
     )
     conn.commit()
     conn.close()
+
+def _purge_old_uploads(directory: Path, patterns, keep: int = 5) -> None:
+    """Ne garde que les `keep` fichiers les plus récents par pattern dans `directory`."""
+    for pattern in patterns:
+        files = sorted(directory.glob(pattern), key=lambda f: f.stat().st_mtime)
+        for old in files[:-keep]:
+            old.unlink(missing_ok=True)
 
 def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
     """Supprime les anciens fichiers log_*.txt et statuts_*.csv, ne garde que les `keep` plus récents de chaque."""

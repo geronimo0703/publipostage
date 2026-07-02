@@ -24,6 +24,9 @@
 #       : pour le message, accepter .html ou .docx
 #       : template_path (.docx document) rendu optionnel : si absent,
 #         aucun PDF n'est généré ni joint à l'email (mail seul).
+#       : traitement du cas windows office365
+#       : on ne garde que les 5 derniers logs
+#       : dans le template .docx, on récupére le reply_to introduit dans le formulaire
 # ==============================================================================
 
 import argparse
@@ -47,6 +50,31 @@ from jinja2 import Template
 # --------------------------------------------------------------------------
 
 def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
+    # 1. Sur Windows, on tente Word via COM (Office 365 suffit, pas besoin de LibreOffice)
+    if sys.platform == "win32":
+        try:
+            import win32com.client
+
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
+            doc = word.Documents.Open(str(docx_path.resolve()))
+            # 17 = wdFormatPDF
+            doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)
+            doc.Close()
+            word.Quit()
+
+            if pdf_path.exists():
+                log(f"📄 Fichier converti (Word) : {pdf_path.name}")
+                return
+            else:
+                log(f"❌ Conversion PDF (Word) : fichier attendu introuvable ({pdf_path})")
+                return
+        except ImportError:
+            log("⚠️ pywin32 non installé, tentative avec LibreOffice…")
+        except Exception as e:
+            log(f"⚠️ Échec conversion via Word ({e}), tentative avec LibreOffice…")
+
+    # 2. Fallback LibreOffice (Windows sans Word, ou Linux/Mac)
     try:
         subprocess.run(
             [
@@ -60,13 +88,14 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
             generated_pdf.rename(pdf_path)
 
         if pdf_path.exists():
-            log(f"📄 Fichier converti : {pdf_path.name}")
+            log(f"📄 Fichier converti (LibreOffice) : {pdf_path.name}")
         else:
             log(f"❌ Conversion PDF : fichier attendu introuvable ({pdf_path})")
     except subprocess.CalledProcessError as e:
         log(f"❌ Échec de la conversion : {e}")
     except FileNotFoundError:
-        log("❌ LibreOffice n'est pas installé ou introuvable dans le PATH.")
+        log("❌ Ni Word (COM) ni LibreOffice ne sont disponibles sur ce poste.")
+
 
 
 def lire_modele_email(chemin_fichier: Path, data=None, personnaliser=False, log=print):
@@ -231,13 +260,18 @@ def run_publipostage(
 
     logs = []
     log_filename = logs_dir / f"log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    log_file_handle = open(log_filename, "a", encoding="utf-8")
+    # En dry_run (preview), on ne persiste rien sur disque : le retour en
+    # mémoire (result["logs"]) suffit pour /preview. Ça évite d'accumuler
+    # un log_*.txt à chaque clic sur "Aperçu".
+    log_file_handle = open(log_filename, "a", encoding="utf-8") if not dry_run else None
+
 
     def log(msg):
-        """Ajoute une ligne au log en mémoire et au fichier de log."""
+        """Ajoute une ligne au log en mémoire et, hors dry_run, au fichier de log."""
         logs.append(msg)
-        log_file_handle.write(msg + "\n")
-        log_file_handle.flush()
+        if log_file_handle:
+            log_file_handle.write(msg + "\n")
+            log_file_handle.flush()
 
     try:
         log(f"Template .docx utilisé : {template_path or '(aucun — mail sans pièce jointe)'}")
@@ -280,6 +314,8 @@ def run_publipostage(
         for index, row in df.iterrows():
             data = row.to_dict()
             data["DATE_DU_JOUR"] = datetime.now().strftime("%d/%m/%Y")
+            data["reply_to"] = smtp_config.get("reply_to", "")  # on prend le paramètre passé  dans le formulaire
+            log(f"🔍 [ligne {index}] reply_to après écrasement = '{data['reply_to']}' (smtp_config.reply_to = '{smtp_config.get('reply_to')}')")
 
             if "Nom_fichier" not in data or pd.isna(data.get("Nom_fichier")):
                 log(f"⚠️ Ligne {index} ignorée : colonne 'Nom_fichier' manquante ou vide")
@@ -397,15 +433,16 @@ def run_publipostage(
                 df.at[index, "Statut"] = "Non envoyé (mode test)"
             log("=====================================================================")
 
-        statuts_path = logs_dir / f"statuts_{Path(csv_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        df.to_csv(statuts_path, index=False, encoding='utf-8-sig')
-        log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
-        log("✨ Tous les documents ont été traités.")
+        if not dry_run:
+            statuts_path = logs_dir / f"statuts_{Path(csv_path).stem}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            df.to_csv(statuts_path, index=False, encoding='utf-8-sig')
+            log(f"✅ Statuts sauvegardés dans : {statuts_path.name}")
+            log("✨ Tous les documents ont été traités.")
 
         return {
             "success": True,
             "logs": logs,
-            "log_file": str(log_filename),
+            "log_file": str(log_filename) if not dry_run else None,
             "previews": previews,
             "preview_pdf": str(preview_pdf_path) if preview_pdf_path else None,
         }
@@ -415,7 +452,8 @@ def run_publipostage(
         return {"success": False, "logs": logs, "log_file": str(log_filename)}
 
     finally:
-        log_file_handle.close()
+        if log_file_handle:
+            log_file_handle.close()
 
 
 # --------------------------------------------------------------------------
