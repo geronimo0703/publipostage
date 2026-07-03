@@ -57,7 +57,7 @@ jobs:
           )
       - name: Write version file
         run: echo "${{ github.ref_name }}" > VERSION
-          shell: bash
+        shell: bash
 
       - name: Construire l'exécutable avec PyInstaller
         run: pyinstaller publipostage.spec
