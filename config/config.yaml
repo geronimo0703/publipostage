@@ -15,7 +15,10 @@ paths:
   # ⚠️ Ne pas confondre avec le dossier "templates/" à la racine du projet,
   # qui est un dossier réservé par Flask pour les pages HTML de l'appli web
   # (index.html). Ce sont deux choses différentes qui portaient le même nom.
-  document_templates_dir: "data/input/templates"
+  # Templates DOCUMENT (fiche PS .docx — pièce jointe à personnaliser)
+  document_templates_dir: "data/input/templates/documents"
+  # Templates MESSAGE (corps de l'email : .html ou .docx)
+  message_templates_dir: "data/input/templates/messages"
 
   uploads_dir: "data/input/uploads"   # réservé pour un futur upload direct depuis le navigateur (non utilisé pour l'instant)
 

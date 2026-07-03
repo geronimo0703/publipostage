@@ -55,6 +55,9 @@ jobs:
               f"SMTP_SERVER={os.environ['SMTP_SERVER']}\n"
               f"SMTP_PORT={os.environ['SMTP_PORT']}\n"
           )
+      - name: Write version file
+          run: echo "${{ github.ref_name }}" > VERSION
+          shell: bash
 
       - name: Construire l'exécutable avec PyInstaller
         run: pyinstaller publipostage.spec

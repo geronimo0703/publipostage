@@ -7,6 +7,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('config/config.yaml', 'config'),
+        ('VERSION', '.'),
         ('templates', 'templates'),
         ('static', 'static'),
         *collect_data_files('mammoth'),

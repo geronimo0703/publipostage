@@ -37,6 +37,12 @@ else:
 
 CONFIG_PATH = RESOURCE_DIR / "config" / "config.yaml"
 
+VERSION_PATH = RESOURCE_DIR / "VERSION"
+try:
+    BUILD_VERSION = VERSION_PATH.read_text(encoding="utf-8").strip()
+except FileNotFoundError:
+    BUILD_VERSION = "dev"  # exécution locale hors build (python app.py direct)
+
 try:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -61,7 +67,8 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "publipostage-dev-key")
 DATA_DIR = Path(user_data_dir(APP_NAME, APP_AUTHOR))
 
 CSV_DIR = DATA_DIR / config["paths"]["csv_dir"]
-DOC_TEMPLATES_DIR = DATA_DIR / config["paths"]["document_templates_dir"]
+DOCUMENT_TEMPLATES_DIR = DATA_DIR / config["paths"]["document_templates_dir"]
+MESSAGE_TEMPLATES_DIR = DATA_DIR / config["paths"]["message_templates_dir"]
 PDF_DIR = DATA_DIR / config["paths"]["pdf_dir"]
 DOC_DIR = DATA_DIR / config["paths"]["doc_dir"]
 LOGS_DIR = DATA_DIR / config["paths"]["logs_dir"]
@@ -71,7 +78,7 @@ DB_TABLE = config["database"]["table_name"]
 DEFAULT_TEMPLATE_NAME = config["default_files"]["template_file"]
 DEFAULT_SEND_EMAILS = config["processing"].get("send_emails_default", False)
 
-for d in (CSV_DIR, DOC_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent):
+for d in (CSV_DIR, DOCUMENT_TEMPLATES_DIR, MESSAGE_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent):
     d.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------
@@ -131,8 +138,8 @@ def _parse_form_params(form):
     docx_filename = form.get('docx') or None
 
     csv_path = CSV_DIR / csv_filename if csv_filename else None
-    docx_path = DOC_TEMPLATES_DIR / docx_filename if docx_filename else None
-    email_template_path = DOC_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+    docx_path = DOCUMENT_TEMPLATES_DIR / docx_filename if docx_filename else None
+    email_template_path = MESSAGE_TEMPLATES_DIR / email_template_filename if email_template_filename else None
     reply_to = form.get("reply_to") or None
 
     return {
@@ -169,7 +176,12 @@ def index():
     return render_template(
         'index.html',
         default_send_emails=DEFAULT_SEND_EMAILS,
+        build_version=BUILD_VERSION,
     )
+
+@app.route('/version')
+def version():
+    return jsonify({"build_version": BUILD_VERSION})
 
 
 @app.route('/list/csv')
@@ -183,14 +195,14 @@ def list_csv_files():
 
 @app.route('/list/templates')
 def list_template_files():
-    files = sorted(f.name for f in DOC_TEMPLATES_DIR.glob("*.docx"))
+    files = sorted(f.name for f in DOCUMENT_TEMPLATES_DIR.glob("*.docx"))
     return jsonify(files)
 
 
 @app.route('/list/email_templates')
 def list_email_templates():
     files = sorted(
-        f.name for f in DOC_TEMPLATES_DIR.iterdir()
+        f.name for f in MESSAGE_TEMPLATES_DIR.iterdir()
         if f.suffix.lower() in {'.html', '.docx'}
     )
     return jsonify(files)
@@ -218,20 +230,19 @@ def upload_csv():
     return jsonify({"success": success, "message": message})
 
 
-
 @app.route('/upload/template', methods=['POST'])
 def upload_template():
-    success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.docx'})
+    success, message = _save_uploaded_file(request.files.get('file'), DOCUMENT_TEMPLATES_DIR, {'.docx'})
     if success:
-        _purge_old_uploads(DOC_TEMPLATES_DIR, ("*.docx",), keep=5)
+        _purge_old_uploads(DOCUMENT_TEMPLATES_DIR, ("*.docx",), keep=5)
     return jsonify({"success": success, "message": message})
 
 
 @app.route('/upload/email_template', methods=['POST'])
 def upload_email_template():
-    success, message = _save_uploaded_file(request.files.get('file'), DOC_TEMPLATES_DIR, {'.html', '.docx'})
+    success, message = _save_uploaded_file(request.files.get('file'), MESSAGE_TEMPLATES_DIR, {'.html', '.docx'})
     if success:
-        _purge_old_uploads(DOC_TEMPLATES_DIR, ("*.html", "*.docx"), keep=5)
+        _purge_old_uploads(MESSAGE_TEMPLATES_DIR, ("*.html", "*.docx"), keep=5)
     return jsonify({"success": success, "message": message})
 
 
