@@ -56,7 +56,7 @@ jobs:
               f"SMTP_PORT={os.environ['SMTP_PORT']}\n"
           )
       - name: Write version file
-          run: echo "${{ github.ref_name }}" > VERSION
+        run: echo "${{ github.ref_name }}" > VERSION
           shell: bash
 
       - name: Construire l'exécutable avec PyInstaller
