@@ -27,6 +27,7 @@
 #       : traitement du cas windows office365
 #       : on ne garde que les 5 derniers logs
 #       : dans le template .docx, on récupére le reply_to introduit dans le formulaire
+#       : ajout d'une recherche LibreOffice sur windows + popup si problème
 # ==============================================================================
 
 import argparse
@@ -39,11 +40,86 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
+import shutil
+import glob
 
 import pandas as pd
 from docx import Document
 from jinja2 import Template
 
+
+import shutil
+import glob
+
+# --------------------------------------------------------------------------
+# Fonction chercher dynamiquement LibreOffice sur portables ou installés dans un dossier custom.
+# --------------------------------------------------------------------------
+
+def _find_soffice() -> str | None:
+    """
+    Cherche l'exécutable LibreOffice de façon robuste, quelle que soit
+    la version ou l'emplacement d'installation.
+    Retourne le chemin trouvé, ou None si rien n'est détecté.
+    """
+    if sys.platform != "win32":
+        # Sur Linux/Mac, on vérifie juste que la commande existe dans le PATH
+        return shutil.which("libreoffice") or shutil.which("soffice")
+
+    # 1. Chemins standards les plus courants
+    fixed_candidates = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+    ]
+    for c in fixed_candidates:
+        if Path(c).exists():
+            return c
+
+    # 2. Recherche par motif, au cas où le dossier contient un numéro de version
+    #    (ex: "LibreOffice 7.6", installs custom, etc.)
+    patterns = [
+        r"C:\Program Files\LibreOffice*\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice*\program\soffice.exe",
+    ]
+    for pattern in patterns:
+        matches = glob.glob(pattern)
+        if matches:
+            return matches[0]
+
+    # 3. Dernier recours : lecture du registre Windows (clé posée par l'installeur)
+    try:
+        import winreg
+        for hive, key_path in [
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\LibreOffice"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\LibreOffice"),
+        ]:
+            try:
+                with winreg.OpenKey(hive, key_path) as key:
+                    install_path, _ = winreg.QueryValueEx(key, "InstallLocation")
+                    candidate = Path(install_path) / "program" / "soffice.exe"
+                    if candidate.exists():
+                        return str(candidate)
+            except FileNotFoundError:
+                continue
+    except ImportError:
+        pass  # winreg indisponible (ne devrait pas arriver sur Windows)
+
+    # 4. Si le PATH le connaît quand même (utilisateur l'a ajouté manuellement)
+    found = shutil.which("soffice") or shutil.which("libreoffice")
+    if found:
+        return found
+
+    return None
+
+def _show_error_popup(message: str) -> None:
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Conversion PDF impossible", message)
+        root.destroy()
+    except Exception:
+        pass  # si tkinter indisponible, on se contente du log
 
 # --------------------------------------------------------------------------
 # Fonctions utilitaires (inchangées dans leur logique)
@@ -75,6 +151,14 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
             log(f"⚠️ Échec conversion via Word ({e}), tentative avec LibreOffice…")
 
     # 2. Fallback LibreOffice (Windows sans Word, ou Linux/Mac)
+
+    soffice_bin = _find_soffice()
+    if soffice_bin is None:
+        msg = "Ni Word (COM) ni LibreOffice ne sont disponibles sur ce poste."
+        log(f"❌ {msg}")
+        _show_error_popup(msg)
+        return
+
     try:
         subprocess.run(
             [
