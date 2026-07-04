@@ -51,6 +51,9 @@ from jinja2 import Template
 import shutil
 import glob
 
+import traceback
+import time
+
 # --------------------------------------------------------------------------
 # Fonction chercher dynamiquement LibreOffice sur portables ou installés dans un dossier custom.
 # --------------------------------------------------------------------------
@@ -159,26 +162,40 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
         _show_error_popup(msg)
         return
 
-    try:
-        subprocess.run(
-            [
-                "libreoffice", "--headless", "--convert-to", "pdf",
-                "--outdir", str(pdf_path.parent), str(docx_path),
-            ],
-            check=True,
-        )
-        generated_pdf = pdf_path.parent / (docx_path.stem + ".pdf")
-        if generated_pdf != pdf_path and generated_pdf.exists():
-            generated_pdf.rename(pdf_path)
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            subprocess.run(
+                [
+                    soffice_bin, "--headless", "--convert-to", "pdf",
+                    "--outdir", str(pdf_path.parent), str(docx_path),
+                ],
+                check=True,
+                timeout=60,
+            )
+            generated_pdf = pdf_path.parent / (docx_path.stem + ".pdf")
+            if generated_pdf != pdf_path and generated_pdf.exists():
+                generated_pdf.rename(pdf_path)
 
-        if pdf_path.exists():
-            log(f"📄 Fichier converti (LibreOffice) : {pdf_path.name}")
-        else:
-            log(f"❌ Conversion PDF : fichier attendu introuvable ({pdf_path})")
-    except subprocess.CalledProcessError as e:
-        log(f"❌ Échec de la conversion : {e}")
-    except FileNotFoundError:
-        log("❌ Ni Word (COM) ni LibreOffice ne sont disponibles sur ce poste.")
+            if pdf_path.exists():
+                log(f"📄 Fichier converti (LibreOffice) : {pdf_path.name}")
+            else:
+                log(f"❌ Conversion PDF : fichier attendu introuvable ({pdf_path})")
+            return  # succès, on sort de la fonction
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            if attempt < max_retries:
+                log(f"⚠️ Tentative {attempt + 1} échouée ({e}), nouvel essai…")
+                time.sleep(2)
+            else:
+                msg = f"Échec de la conversion après {max_retries + 1} tentatives : {e}"
+                log(f"❌ {msg}")
+                _show_error_popup(msg)
+        except FileNotFoundError:
+            msg = f"Exécutable LibreOffice détecté mais non exécutable ({soffice_bin})."
+            log(f"❌ {msg}")
+            _show_error_popup(msg)
+            return
 
 
 
@@ -533,6 +550,7 @@ def run_publipostage(
 
     except Exception as e:
         log(f"❌ Erreur fatale : {e}")
+        log(traceback.format_exc())
         return {"success": False, "logs": logs, "log_file": str(log_filename)}
 
     finally:
