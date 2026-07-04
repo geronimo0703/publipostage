@@ -1,5 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
+hidden_imports = [
+    'email.mime.multipart', 'email.mime.text', 'email.mime.base',
+    'publipostage_stock_ed7',
+    *collect_submodules('mammoth'),
+]
+if sys.platform == "win32":
+    hidden_imports += ['win32com', 'win32com.client', 'pythoncom', 'pywintypes']
 
 a = Analysis(
     ['app.py'],
@@ -12,11 +21,7 @@ a = Analysis(
         ('static', 'static'),
         *collect_data_files('mammoth'),
     ],
-    hiddenimports=[
-        'email.mime.multipart', 'email.mime.text', 'email.mime.base',
-        'publipostage_stock_ed7',
-        *collect_submodules('mammoth'),
-    ],
+    hiddenimports=hidden_imports,
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
