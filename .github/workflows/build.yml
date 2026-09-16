@@ -93,6 +93,7 @@ jobs:
             publipostage-linux.zip
             publipostage-windows.zip
           if-no-files-found: ignore
+          retention-days: 7
 
   release:
     needs: build
