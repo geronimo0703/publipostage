@@ -181,6 +181,19 @@ Prérequis : validation en 2 étapes activée sur le compte Google.
 Le volontaire **n'a jamais besoin de connaître ces chemins** — tout passe
 par l'interface web (upload de fichiers, config SMTP pré-remplie).
 
+> ⚠️ **Exception : le fichier `.env`** doit être créé manuellement dans `DATA_DIR` lors de la première installation sur chaque machine :
+>
+> - **Linux** : `~/.local/share/BanqueAlimentaire22/Publipostage/.env`
+> - **Windows** : `C:\Users\<user>\AppData\Local\BanqueAlimentaire22\Publipostage\.env`
+>
+> Contenu attendu :
+> ```
+> SMTP_USER=ba220.informatique@banquealimentaire.org
+> SMTP_PASSWORD=<mot de passe d'application Gmail>
+> SMTP_FROM=ba220.benevoles@banquealimentaire.org
+> FLASK_SECRET_KEY=<clé aléatoire>
+> ```
+
 ---
 
 ## Dépannage
