@@ -22,6 +22,7 @@ paths:
 
   uploads_dir: "data/input/uploads"   # réservé pour un futur upload direct depuis le navigateur (non utilisé pour l'instant)
 
+  attachments_dir: "data/input/attachments"  # pièces jointes génériques (.pdf/.docx)
   output_dir: "data/output"
   pdf_dir: "data/output/pdfs"
   doc_dir: "data/output/docs"

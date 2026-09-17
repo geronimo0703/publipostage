@@ -449,6 +449,25 @@
                 <span class="upload-msg" id="email-upload-message">—</span>
             </div>
 
+            <div class="upload-row">
+                <div class="upload-icon docx">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                </div>
+                <div class="upload-meta">
+                    <div class="upload-name">Pièces jointes génériques</div>
+                    <div class="upload-hint">Documents communs à tous les destinataires — .pdf ou .docx</div>
+                </div>
+                <div class="upload-btn-wrap">
+                    <input type="file" id="attachment-file" accept=".pdf,.docx">
+                    <span class="upload-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Choisir
+                    </span>
+                </div>
+                <button class="upload-import-btn" onclick="uploadFile('attachment-file', '/upload/attachment', 'attachment', loadAttachmentList)">Importer</button>
+                <span class="upload-msg" id="attachment-upload-message">—</span>
+            </div>
+
         </div>
     </section>
 
@@ -487,6 +506,18 @@
                         </select>
                     </div>
                 </div>
+                                <!-- Pièces jointes génériques -->
+                <div>
+                    <div class="field-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Pièces jointes communes (optionnel)
+                    </div>
+                    <div id="attachments-list"
+                         style="border:1px solid var(--border-c);border-radius:var(--r-sm);padding:8px 10px;background:#fff;min-height:40px;display:flex;flex-direction:column;gap:6px;">
+                        <span style="font-size:12px;color:var(--ink3)">Aucune pièce jointe disponible</span>
+                    </div>
+                </div>
+
 
                 <!-- Toggle email -->
                 <div>
@@ -651,12 +682,49 @@ document.addEventListener('DOMContentLoaded', function () {
     function loadCsvList()           { loadList('/list/csv',             document.getElementById('csv'),            'Aucun fichier CSV trouvé'); }
     function loadTemplateList()      { loadList('/list/templates',        document.getElementById('docx'),           'Aucun template DOCX trouvé'); }
     function loadEmailTemplateList() { loadList('/list/email_templates',  document.getElementById('email_template'), 'Aucun modèle email trouvé'); }
+    function loadAttachmentList() {
+        fetch('/list/attachments')
+            .then(r => r.json())
+            .then(files => {
+                const container = document.getElementById('attachments-list');
+                if (files.length === 0) {
+                    container.innerHTML = '<span style="font-size:12px;color:var(--ink3)">Aucune pièce jointe disponible</span>';
+                    return;
+                }
+                container.innerHTML = files.map(f => `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer;flex:1;">
+                        <input type="checkbox" name="attachments" value="${f}"
+                                style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);">
+                        ${f}
+                    </label>
+                    <button type="button" onclick="deleteAttachment('${f}')"
+                            style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;"
+                            title="Supprimer">✕</button>
+                </div>`).join('');
+            })
+            .catch(() => {
+                document.getElementById('attachments-list').innerHTML =
+                    '<span style="font-size:12px;color:var(--red)">Erreur de chargement</span>';
+            });
+    }
+
+    function deleteAttachment(filename) {
+        if (!confirm(`Supprimer "${filename}" ?`)) return;
+        fetch(`/delete/attachment/${encodeURIComponent(filename)}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) loadAttachmentList();
+            });
+    }
+    window.deleteAttachment = deleteAttachment;
 
     window.loadCsvList           = loadCsvList;
     window.loadTemplateList      = loadTemplateList;
     window.loadEmailTemplateList = loadEmailTemplateList;
+    window.loadAttachmentList    = loadAttachmentList;
 
-    loadCsvList(); loadTemplateList(); loadEmailTemplateList();
+    loadCsvList(); loadTemplateList(); loadEmailTemplateList(); loadAttachmentList();
 
     // ── Toggle email options ──────────────────────────────────
 

@@ -74,6 +74,8 @@ DOC_DIR = DATA_DIR / config["paths"]["doc_dir"]
 LOGS_DIR = DATA_DIR / config["paths"]["logs_dir"]
 DB_PATH = DATA_DIR / config["database"]["path"]
 DB_TABLE = config["database"]["table_name"]
+ATTACHMENT_DIR = DATA_DIR / config["paths"]["attachments_dir"]
+ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_TEMPLATE_NAME = config["default_files"]["template_file"]
 DEFAULT_SEND_EMAILS = config["processing"].get("send_emails_default", False)
@@ -137,6 +139,12 @@ def _parse_form_params(form):
     # docx vide ("— Sans pièce jointe —") = mail sans pièce jointe
     docx_filename = form.get('docx') or None
 
+        # Pièces jointes génériques (multi-sélection)
+    attachment_filenames = form.getlist('attachments')
+    attachment_paths = [ATTACHMENT_DIR / f for f in attachment_filenames if f]
+    print(f"🔍 attachment_filenames = {attachment_filenames}", flush=True)
+    print(f"🔍 attachment_paths = {attachment_paths}", flush=True)
+
     csv_path = CSV_DIR / csv_filename if csv_filename else None
     docx_path = DOCUMENT_TEMPLATES_DIR / docx_filename if docx_filename else None
     email_template_path = MESSAGE_TEMPLATES_DIR / email_template_filename if email_template_filename else None
@@ -152,6 +160,7 @@ def _parse_form_params(form):
         "docx_path": docx_path,
         "email_template_path": email_template_path,
         "reply_to": reply_to,
+        "attachment_paths": attachment_paths,
     }
 
 
@@ -198,6 +207,31 @@ def list_template_files():
     files = sorted(f.name for f in DOCUMENT_TEMPLATES_DIR.glob("*.docx"))
     return jsonify(files)
 
+@app.route('/list/attachments')
+def list_attachments():
+    files = sorted(
+        f.name for f in ATTACHMENT_DIR.iterdir()
+        if f.suffix.lower() in {'.pdf', '.docx'}
+    )
+    return jsonify(files)
+
+
+@app.route('/upload/attachment', methods=['POST'])
+def upload_attachment():
+    success, message = _save_uploaded_file(
+        request.files.get('file'), ATTACHMENT_DIR, {'.pdf', '.docx'}
+    )
+    if success:
+        _purge_old_uploads(ATTACHMENT_DIR, ("*.pdf", "*.docx"), keep=10)
+    return jsonify({"success": success, "message": message})
+
+@app.route('/delete/attachment/<filename>', methods=['POST'])
+def delete_attachment(filename):
+    path = ATTACHMENT_DIR / filename
+    if path.exists() and path.parent == ATTACHMENT_DIR:
+        path.unlink()
+        return jsonify({"success": True, "message": f"{filename} supprimé"})
+    return jsonify({"success": False, "message": "Fichier introuvable"})
 
 @app.route('/list/email_templates')
 def list_email_templates():
@@ -280,7 +314,7 @@ def upload_files():
             p["csv_path"], p["docx_path"],
             p["send_emails"], True,
             p["email_template_path"], campaign_id,
-            p["reply_to"],
+            p["reply_to"], p["attachment_paths"],
         ),
         daemon=True,
     ).start()
@@ -312,7 +346,7 @@ def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
         for old in files[:-keep]:
             old.unlink(missing_ok=True)
 
-def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id,reply_to=None):
+def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id, reply_to=None, attachment_paths=None):
     print(f"🔍 reply_to dans lancer_campagne = '{reply_to}'", flush=True)
     campaign_logs[campaign_id]["status"] = "En cours"
     label = docx_path.name if docx_path else "mail seul"
@@ -334,6 +368,7 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
             smtp_port=SMTP_PORT,
             smtp_from=SMTP_FROM,
             reply_to=reply_to,
+            attachment_paths=attachment_paths or [],
         )
         statut = "Terminé" if result["success"] else "Erreur"
         campaign_logs[campaign_id]["status"] = statut

@@ -233,7 +233,7 @@ def normaliser_destinataires(raw_email: str):
     return [a.strip() for a in raw_email.replace(";", ",").split(",") if a.strip()]
 
 
-def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=None, personnaliser=False, log=print):
+def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=None, personnaliser=False, log=print, extra_attachments=None):
     smtp_user = smtp_config.get("user")
     smtp_from = smtp_config.get("from", smtp_user)
     smtp_password = smtp_config.get("password")
@@ -282,6 +282,18 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
     else:
         log("📧 Envoi sans pièce jointe")
 
+        # Pièces jointes génériques communes
+    for att_path in (extra_attachments or []):
+        att_path = Path(att_path)
+        if att_path.exists():
+            with open(att_path, "rb") as f:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(f.read())
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", f"attachment; filename={att_path.name}")
+                msg.attach(part)
+            log(f"📎 Pièce jointe générique : {att_path.name}")
+
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
@@ -313,6 +325,7 @@ def run_publipostage(
     smtp_port: int = 587,
     smtp_from: str = None,
     reply_to: str = None,
+    attachment_paths: list = None,
     dry_run: bool = False,
 ):
     """
@@ -517,9 +530,10 @@ def run_publipostage(
                     subject = data.get("Sujet", "")
                     success, error_msg = send_email(
                         email_to_raw, subject,
-                        pdf_to_attach,           # None si pas de template docx
+                        pdf_to_attach,
                         email_template_path,
                         smtp_config=smtp_config, data=data, personnaliser=personalize, log=log,
+                        extra_attachments=attachment_paths,
                     )
                     df.at[index, "Statut"] = "Envoyé" if success else f"Erreur: {error_msg}"
                     df.at[index, "Date_envoi"] = (
