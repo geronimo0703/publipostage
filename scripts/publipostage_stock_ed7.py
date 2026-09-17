@@ -327,6 +327,7 @@ def run_publipostage(
     reply_to: str = None,
     attachment_paths: list = None,
     dry_run: bool = False,
+    preview_count: int = None,
 ):
     """
     Exécute le traitement complet : génère les fiches docx/pdf à partir du
@@ -424,6 +425,11 @@ def run_publipostage(
             if col not in df.columns:
                 df[col] = ""
             df[col] = df[col].astype("object")
+
+                # Échantillonnage aléatoire pour la prévisualisation
+        if dry_run and preview_count and preview_count < len(df):
+            df = df.sample(n=preview_count).reset_index(drop=True)
+            log(f"🔀 Prévisualisation : {preview_count} lignes tirées au sort sur {len(df)} au total")
 
         for index, row in df.iterrows():
             data = row.to_dict()

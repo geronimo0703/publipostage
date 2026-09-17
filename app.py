@@ -438,6 +438,8 @@ def preview():
     print(f"🔍 form complet = {dict(request.form)}", flush=True)
     p = _parse_form_params(request.form)
 
+    preview_count = int(request.form.get('preview_count', 3))
+
     result = run_publipostage(
         csv_path=p["csv_path"],
         template_path=p["docx_path"],       # None si pas de pièce jointe
@@ -454,6 +456,7 @@ def preview():
         smtp_from=SMTP_FROM,
         reply_to=p["reply_to"],
         dry_run=True,
+        preview_count=preview_count,
     )
 
     session['preview_pdf'] = result.get("preview_pdf")

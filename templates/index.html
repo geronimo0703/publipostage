@@ -555,7 +555,13 @@
                         </div>
                     </div>
                 </div>
-
+                <!-- Nombre d'aperçus -->
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surf);border:1px solid var(--border-c);border-radius:var(--r-sm);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <label for="preview_count" style="font-size:14px;color:var(--ink);flex:1;">Nombre d'aperçus aléatoires</label>
+                    <input type="number" name="preview_count" id="preview_count" value="3" min="1" max="20"
+                           style="width:60px;padding:4px 8px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:14px;color:var(--ink);text-align:center;">
+                </div>
                 <!-- Actions -->
                 <div class="actions-row">
                     <button type="submit" formaction="/preview" class="btn-action btn-preview">
