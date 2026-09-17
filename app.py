@@ -96,8 +96,8 @@ if not SMTP_USER or not SMTP_PASSWORD:
     print(f"⚠️  SMTP non configuré — fichier .env attendu ici : {DATA_DIR / '.env'}", flush=True)
 else:
     print(f"✅ SMTP chargé pour : {SMTP_USER}", flush=True)
-SMTP_SERVER = config.get("email", {}).get("smtp_server", "smtp.gmail.com")
-SMTP_PORT = config.get("email", {}).get("smtp_port", 587)
+SMTP_SERVER = os.getenv("SMTP_SERVER") or config.get("email", {}).get("smtp_server", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT") or config.get("email", {}).get("smtp_port", 587))
 
 
 def init_db():

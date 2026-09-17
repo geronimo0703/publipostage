@@ -59,8 +59,10 @@ processing:
 # peut être versionné dans Git). Ils vivent uniquement dans le fichier .env
 # (non versionné), lu par le script via os.getenv().
 email:
-  smtp_server: "smtp.gmail.com"
+  smtp_server: "smtp-relay.brevo.com"
   smtp_port: 587
+#  smtp_server: "smtp.gmail.com"
+#  smtp_port: 587
 
 # --------------------------------------------
 # Configuration de la base de données
