@@ -184,7 +184,7 @@ par l'interface web (upload de fichiers, config SMTP pré-remplie).
 > ⚠️ **Exception : le fichier `.env`** doit être créé manuellement dans `DATA_DIR` lors de la première installation sur chaque machine :
 >
 > - **Linux** : `~/.local/share/BanqueAlimentaire22/Publipostage/.env`
-> - **Windows** : `C:\Users\<user>\AppData\Local\BanqueAlimentaire22\Publipostage\.env`
+> - **Windows** : `C:\Users\<user>\AppData\Local\Publipostage\.env`
 >
 > Contenu attendu :
 > ```
