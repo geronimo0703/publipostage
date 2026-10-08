@@ -189,7 +189,6 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
             subprocess.run(
                 [
                     soffice_bin, "--headless", "--norestore", "--nofirststartwizard",
-                    "-env:UserInstallation=file:///tmp/libreoffice_publipostage",
                     "--convert-to", "pdf",
                     "--outdir", str(pdf_path.parent), str(docx_path),
                 ],
@@ -454,6 +453,15 @@ def run_publipostage(
             'courriel': 'Email',
         }
         df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+         # Fallback Client si absent
+        if 'Client' not in df.columns:
+            if 'nom' in df.columns and 'prénom' in df.columns:
+                df['Client'] = df['prénom'].str.strip() + ' ' + df['nom'].str.strip()
+            elif 'nom' in df.columns:
+                df['Client'] = df['nom'].str.strip()
+            elif 'commune' in df.columns:
+                df['Client'] = df['commune'].str.strip()
 
         # Génération automatique de Nom_fichier si absent
         if 'Nom_fichier' not in df.columns:
