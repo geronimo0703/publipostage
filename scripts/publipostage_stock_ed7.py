@@ -136,6 +136,7 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
 
             word = win32com.client.Dispatch("Word.Application")
             word.Visible = False
+            word.DisplayAlerts = False
             doc = word.Documents.Open(str(docx_path.resolve()))
             # 17 = wdFormatPDF
             doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)
