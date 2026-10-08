@@ -167,7 +167,8 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
         try:
             subprocess.run(
                 [
-                    soffice_bin, "--headless", "--convert-to", "pdf",
+                    soffice_bin, "--headless", "--norestore", "--nofirststartwizard",
+                    "--convert-to", "pdf",
                     "--outdir", str(pdf_path.parent), str(docx_path),
                 ],
                 check=True,
