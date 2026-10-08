@@ -467,6 +467,7 @@ def preview():
         form=request.form,
         send_emails=p["send_emails"],
         has_pdf=bool(result.get("preview_pdf")),
+        attachment_filenames=[p.name for p in p["attachment_paths"]],
     )
 
 

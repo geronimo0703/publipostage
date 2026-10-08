@@ -226,8 +226,10 @@ def lire_modele_email(chemin_fichier: Path, data=None, personnaliser=False, log=
     return contenu
 
 
-def normaliser_destinataires(raw_email: str):
-    """Convertit 'a@x.com;b@y.com' (ou avec des virgules) en liste propre."""
+def normaliser_destinataires(raw_email):
+    if not raw_email or (isinstance(raw_email, float)):
+        return []
+    raw_email = str(raw_email).strip()
     if not raw_email:
         return []
     return [a.strip() for a in raw_email.replace(";", ",").split(",") if a.strip()]
@@ -420,6 +422,26 @@ def run_publipostage(
             df = pd.read_csv(csv_path, encoding='utf-8-sig', sep=None, engine='python')
             log("=== COLONNES DU CSV ===")
         log(str(df.columns.tolist()))
+
+        # Normalisation des noms de colonnes alternatifs
+        col_map = {
+            'adresse mail': 'Email',
+            'mail': 'Email',
+            'e-mail': 'Email',
+            'courriel': 'Email',
+        }
+        df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+
+        # Génération automatique de Nom_fichier si absent
+        if 'Nom_fichier' not in df.columns:
+            if 'nom' in df.columns and 'prénom' in df.columns:
+                df['Nom_fichier'] = df['nom'].str.strip() + '_' + df['prénom'].str.strip()
+            elif 'nom' in df.columns:
+                df['Nom_fichier'] = df['nom'].str.strip()
+            elif 'commune' in df.columns:
+                df['Nom_fichier'] = df['commune'].str.strip()
+            else:
+                df['Nom_fichier'] = df.index.astype(str)
 
         for col in ("Statut", "Date_envoi"):
             if col not in df.columns:
