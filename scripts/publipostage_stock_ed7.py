@@ -129,8 +129,8 @@ def _show_error_popup(message: str) -> None:
 # --------------------------------------------------------------------------
 
 def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
-    # 1. Sur Windows, on tente Word via COM (Office 365 suffit, pas besoin de LibreOffice)
-    if sys.platform == "win32":
+    # 1. Sur Windows, on tente Word via COM (seulement si LibreOffice absent)
+    if sys.platform == "win32" and _find_soffice() is None:
         try:
             import win32com.client
 
