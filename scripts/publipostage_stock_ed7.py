@@ -189,6 +189,8 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
             subprocess.run(
                 [
                     soffice_bin, "--headless", "--norestore", "--nofirststartwizard",
+                    "--noplugins", "--nocrashreport", "--nodefault",
+                    "-env:UserInstallation=file:///tmp/libreoffice_publipostage",
                     "--convert-to", "pdf",
                     "--outdir", str(pdf_path.parent), str(docx_path),
                 ],
