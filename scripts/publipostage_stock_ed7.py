@@ -141,7 +141,23 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
                 word.ActivePrinter = "Microsoft Print to PDF"
             except Exception:
                 pass
-            doc = word.Documents.Open(str(docx_path.resolve()))
+            doc = word.Documents.Open(
+                str(docx_path.resolve()),
+                ConfirmConversions=False,
+                ReadOnly=False,
+                AddToRecentFiles=False,
+                PasswordDocument="",
+                PasswordTemplate="",
+                Revert=False,
+                WritePasswordDocument="",
+                WritePasswordTemplate="",
+                Format=0,
+                Encoding=0,
+                Visible=False,
+                OpenAndRepair=False,
+                DocumentDirection=0,
+                NoEncodingDialog=True,
+            )
             # 17 = wdFormatPDF
             doc.SaveAs(str(pdf_path.resolve()), FileFormat=17)
             doc.Close()
