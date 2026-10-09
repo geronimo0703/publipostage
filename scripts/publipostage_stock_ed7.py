@@ -114,15 +114,7 @@ def _find_soffice() -> str | None:
     return None
 
 def _show_error_popup(message: str) -> None:
-    try:
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror("Conversion PDF impossible", message)
-        root.destroy()
-    except Exception:
-        pass  # si tkinter indisponible, on se contente du log
+    pass  # popup supprimé — le message apparaît dans les logs de l'interface
 
 # --------------------------------------------------------------------------
 # Fonctions utilitaires (inchangées dans leur logique)
