@@ -472,6 +472,7 @@ def run_publipostage(
             df[col] = df[col].astype("object")
 
                 # Échantillonnage aléatoire pour la prévisualisation
+        total_rows = len(df)
         if dry_run and preview_count and preview_count < len(df):
             df = df.sample(n=preview_count).reset_index(drop=True)
             log(f"🔀 Prévisualisation : {preview_count} lignes tirées au sort sur {len(df)} au total")
@@ -611,7 +612,8 @@ def run_publipostage(
             "log_file": str(log_filename) if not dry_run else None,
             "previews": previews,
             "preview_pdf": str(preview_pdf_path) if preview_pdf_path else None,
-        }
+            "total_count": total_rows,
+            }
 
     except Exception as e:
         log(f"❌ Erreur fatale : {e}")

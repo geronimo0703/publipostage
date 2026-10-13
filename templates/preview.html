@@ -376,7 +376,7 @@
                 {% endfor %}
                 <button type="submit" class="btn-confirm">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    Confirmer et lancer — {{ previews|length }} fiche{{ 's' if previews|length > 1 }}
+                    Confirmer et lancer — {{ total_count }} fiche{{ 's' if total_count > 1 }}
                 </button>
             </form>
         </div>

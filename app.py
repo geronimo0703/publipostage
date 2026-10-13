@@ -233,6 +233,36 @@ def delete_attachment(filename):
         return jsonify({"success": True, "message": f"{filename} supprimé"})
     return jsonify({"success": False, "message": "Fichier introuvable"})
 
+@app.route('/delete/csv/<filename>', methods=['POST'])
+
+
+def delete_csv(filename):
+    path = CSV_DIR / filename
+    if path.exists() and path.parent == CSV_DIR:
+        path.unlink()
+        return jsonify({"success": True, "message": f"{filename} supprimé"})
+    return jsonify({"success": False, "message": "Fichier introuvable"})
+
+@app.route('/delete/template/<filename>', methods=['POST'])
+def delete_template(filename):
+    path = DOCUMENT_TEMPLATES_DIR / filename
+    if path.exists() and path.parent == DOCUMENT_TEMPLATES_DIR:
+        path.unlink()
+        return jsonify({"success": True, "message": f"{filename} supprimé"})
+    return jsonify({"success": False, "message": "Fichier introuvable"})
+
+@app.route('/delete/email_template/<filename>', methods=['POST'])
+def delete_email_template(filename):
+    path = MESSAGE_TEMPLATES_DIR / filename
+    if path.exists() and path.parent == MESSAGE_TEMPLATES_DIR:
+        path.unlink()
+        return jsonify({"success": True, "message": f"{filename} supprimé"})
+    return jsonify({"success": False, "message": "Fichier introuvable"})
+    if path.exists() and path.parent == ATTACHMENT_DIR:
+        path.unlink()
+        return jsonify({"success": True, "message": f"{filename} supprimé"})
+    return jsonify({"success": False, "message": "Fichier introuvable"})
+
 @app.route('/list/email_templates')
 def list_email_templates():
     files = sorted(
@@ -468,6 +498,7 @@ def preview():
         send_emails=p["send_emails"],
         has_pdf=bool(result.get("preview_pdf")),
         attachment_filenames=[p.name for p in p["attachment_paths"]],
+        total_count=result.get("total_count", len(result.get("previews", []))),
     )
 
 

@@ -487,10 +487,14 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Fichier bénéficiaires
                     </div>
-                    <div class="select-wrap">
-                        <select name="csv" id="csv" required>
-                            <option value="" disabled selected>Sélectionner un fichier CSV</option>
-                        </select>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <div class="select-wrap" style="flex:1">
+                            <select name="csv" id="csv" required>
+                                <option value="" disabled selected>Sélectionner un fichier CSV</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="deleteSelected('csv', '/delete/csv/')"
+                                style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;" title="Supprimer le fichier sélectionné de la liste">✕</button>
                     </div>
                 </div>
 
@@ -500,10 +504,14 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6m-3-3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><polyline points="17 0 21 3 17 6"/></svg>
                         Pièce jointe (optionnel)
                     </div>
-                    <div class="select-wrap">
-                        <select name="docx" id="docx">
-                            <option value="">— Sans pièce jointe —</option>
-                        </select>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <div class="select-wrap" style="flex:1">
+                                <select name="docx" id="docx">
+                                    <option value="">— Sans pièce jointe —</option>
+                                </select>
+                            </div>
+                        <button type="button" onclick="deleteSelected('docx', '/delete/template/')"
+                                style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;" title="Supprimer le template sélectionné de la liste">✕</button>
                     </div>
                 </div>
                                 <!-- Pièces jointes génériques -->
@@ -532,10 +540,15 @@
                     <div id="email-options" class="email-sub" style="margin-top:.75rem;display:grid;gap:.75rem">
                         <div>
                             <div class="field-label" style="font-size:13px;margin-bottom:.375rem">Modèle email</div>
-                            <div class="select-wrap">
-                                <select name="email_template" id="email_template">
-                                    <option value="" disabled selected>Sélectionner un modèle</option>
-                                </select>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <div class="select-wrap" style="flex:1">
+                                        <select name="email_template" id="email_template">
+                                            <option value="" disabled selected>Sélectionner un modèle</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" onclick="deleteSelected('email_template', '/delete/email_template/')"
+                                            style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;"
+                                            title="Supprimer le modèle email sélectionné de la liste">✕</button>
                             </div>
                         </div>
                         <div>
@@ -891,6 +904,20 @@ async function uploadFile(inputId, endpoint, msgSuffix, refreshFn) {
     } catch (err) {
         msgEl.textContent = 'Erreur réseau';
         msgEl.className   = 'upload-msg error';
+    }
+}
+
+async function deleteSelected(selectId, endpoint) {
+    const select = document.getElementById(selectId);
+    const filename = select.value;
+    if (!filename) return;
+    if (!confirm(`Supprimer "${filename}" ?`)) return;
+    const response = await fetch(endpoint + encodeURIComponent(filename), { method: 'POST' });
+    const result = await response.json();
+    if (result.success) {
+        if (selectId === 'csv') loadCsvList();
+        else if (selectId === 'docx') loadTemplateList();
+        else if (selectId === 'email_template') loadEmailTemplateList();
     }
 }
 </script>
