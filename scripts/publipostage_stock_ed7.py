@@ -520,7 +520,6 @@ def run_publipostage(
                                         placeholder = f"{{{{{key}}}}}"
                                         if placeholder in paragraph.text:
                                             paragraph.text = paragraph.text.replace(placeholder, str(value))
-                    doc.add_paragraph(f"\nFait à Lannion, le {data['DATE_DU_JOUR']}")
 
                     preview_docx = doc_dir / f"_preview_{data['Nom_fichier']}.docx"
                     doc.save(preview_docx)
@@ -559,8 +558,6 @@ def run_publipostage(
                                         placeholder_with_spaces = f"{{{{ {key} }}}}"
                                         if placeholder_with_spaces in paragraph.text:
                                             paragraph.text = paragraph.text.replace(placeholder_with_spaces, str(value))
-
-                doc.add_paragraph(f"\nFait à Lannion, le {data['DATE_DU_JOUR']}")
 
                 output_filename = f"fiche_PS_remplie_{data['Nom_fichier']}.docx"
                 output_path = doc_dir / output_filename
