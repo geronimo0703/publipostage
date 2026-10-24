@@ -482,6 +482,42 @@
         </div>
     </section>
 
+    <!-- ── Dépannage process ── -->
+    <section>
+        <div class="section-label">Dépannage — Relancer l'application</div>
+        <div class="table-card">
+            <div class="table-head">
+                <div class="table-head-icon accent">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div>
+                    <div class="table-head-title">Modifications du code non prises en compte ?</div>
+                    <div class="table-head-sub">Un ancien process tourne peut-être encore en arrière-plan</div>
+                </div>
+            </div>
+            <div style="padding:1rem 1.25rem;display:grid;gap:1rem;">
+                <div>
+                    <div class="step-title" style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">🐧 Linux — tuer le process et relancer</div>
+                    <div style="background:#0f172a;border-radius:var(--r-sm);padding:.75rem 1rem;font-family:monospace;font-size:12px;color:#94a3b8;">
+                        kill $(lsof -t -i:5000) 2>/dev/null && python app.py
+                    </div>
+                    <div style="font-size:12px;color:var(--ink3);margin-top:6px;">Tue tout process qui écoute sur le port 5000, puis relance l'application. Le <code>2>/dev/null</code> évite une erreur si aucun process ne tournait.</div>
+                </div>
+                <div>
+                    <div class="step-title" style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:6px">🪟 Windows — tuer le binaire</div>
+                    <div style="background:#0f172a;border-radius:var(--r-sm);padding:.75rem 1rem;font-family:monospace;font-size:12px;color:#94a3b8;">
+                        taskkill /F /IM publipostage-windows.exe
+                    </div>
+                    <div style="font-size:12px;color:var(--ink3);margin-top:6px;">À lancer depuis <code>cmd</code>, ou via le Gestionnaire des tâches (<code>Ctrl+Maj+Échap</code>) → clic droit sur <code>publipostage-windows</code> → Fin de tâche.</div>
+                </div>
+                <div class="note">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Python charge les modules <strong>une seule fois au démarrage</strong> — toute modification du code nécessite un redémarrage complet pour être prise en compte.
+                </div>
+            </div>
+        </div>
+    </section>
+
     <div class="back-row">
         <a href="{{ url_for('index') }}" class="btn-back">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>

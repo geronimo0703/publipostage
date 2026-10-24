@@ -42,6 +42,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 import shutil
 import glob
+import re
 
 import pandas as pd
 from docx import Document
@@ -321,7 +322,39 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
         log(f"❌ Échec de l'envoi à {', '.join(recipients)}: {e}")
         return False, str(e)
 
+def _replace_in_paragraph(paragraph, data):
+    """Remplace les placeholders dans un paragraphe en gérant les runs fragmentés."""
+    # 1. Reconstruire le texte complet du paragraphe
+    full_text = "".join(run.text for run in paragraph.runs)
 
+    # 2. Vérifier si un placeholder est présent
+    modified = False
+    for key, value in data.items():
+        clean_value = "" if pd.isna(value) else str(value).strip().replace('\n', ' ').replace('\r', '')
+        placeholder = f"{{{{{key}}}}}"
+        placeholder_sp = f"{{{{ {key} }}}}"
+        if placeholder in full_text:
+            full_text = full_text.replace(placeholder, clean_value)
+            modified = True
+        elif placeholder_sp in full_text:
+            full_text = full_text.replace(placeholder_sp, clean_value)
+            modified = True
+
+    # 3. Si modifié, réécrire dans le premier run et vider les autres
+    if modified:
+        if paragraph.runs:
+            paragraph.runs[0].text = full_text
+            for run in paragraph.runs[1:]:
+                run.text = ""
+
+def _replace_in_table(table, data):
+    """Remplace les placeholders dans un tableau, y compris les tableaux imbriqués."""
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                _replace_in_paragraph(paragraph, data)
+            for nested_table in cell.tables:
+                _replace_in_table(nested_table, data)
 # --------------------------------------------------------------------------
 # Fonction principale, importable directement par app.py
 # --------------------------------------------------------------------------
@@ -437,14 +470,16 @@ def run_publipostage(
             log("=== COLONNES DU CSV ===")
         log(str(df.columns.tolist()))
 
-        # Normalisation des noms de colonnes alternatifs
-        col_map = {
-            'adresse mail': 'Email',
-            'mail': 'Email',
-            'e-mail': 'Email',
-            'courriel': 'Email',
-        }
-        df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
+        # Normalisation : créer la colonne Email depuis les variantes, sans supprimer l'originale
+        email_cols = ['adresse mail', 'mail', 'e-mail', 'courriel']
+        if 'Email' not in df.columns:
+            for col in email_cols:
+                if col in df.columns:
+                    df['Email'] = df[col]
+                    break
+        # Nettoyage des codes postaux (évite "22450.0")
+        if 'code postal' in df.columns:
+            df['code postal'] = df['code postal'].fillna('').astype(str).str.replace(r'\.0$', '', regex=True)
 
          # Fallback Client si absent
         if 'Client' not in df.columns:
@@ -477,6 +512,39 @@ def run_publipostage(
             df = df.sample(n=preview_count).reset_index(drop=True)
             log(f"🔀 Prévisualisation : {preview_count} lignes tirées au sort sur {len(df)} au total")
 
+
+        # ── Vérification préventive des placeholders ──────────────────
+        if template_path:
+            import re
+            placeholders_doc = set()
+            doc_check = Document(template_path)
+            for para in doc_check.paragraphs:
+                for m in re.findall(r'\{\{([^}]+)\}\}', para.text):
+                    placeholders_doc.add(m)
+            for table in doc_check.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for m in re.findall(r'\{\{([^}]+)\}\}', cell.text):
+                            placeholders_doc.add(m)
+
+            colonnes = set(df.columns)
+            # Ces placeholders sont injectés par le code, pas par l'Excel
+            placeholders_auto = {'DATE_DU_JOUR', 'reply_to'}
+            manquants = [p for p in placeholders_doc
+                        if p not in colonnes and p not in placeholders_auto]
+            if manquants:
+                for m in manquants:
+                    log(f"⚠️ Placeholder '{{{{{m}}}}}' absent des colonnes Excel")
+                log("❌ Traitement annulé — corrigez le template ou le fichier Excel avant de relancer")
+                return {
+                    "success": False,
+                    "logs": logs,
+                    "log_file": str(log_filename) if not dry_run else None,
+                    "previews": [],
+                    "preview_pdf": None,
+                    "total_count": total_rows,
+                }
+
         for index, row in df.iterrows():
             data = row.to_dict()
             data["DATE_DU_JOUR"] = datetime.now().strftime("%d/%m/%Y")
@@ -506,20 +574,9 @@ def run_publipostage(
                 if preview_pdf_path is None and template_path:
                     doc = Document(template_path)
                     for paragraph in doc.paragraphs:
-                        for key, value in data.items():
-                            if pd.notna(value):
-                                clean_value = str(value).strip().replace('\n', ' ').replace('\r', '')
-                                placeholder = f"{{{{{key}}}}}"
-                                if placeholder in paragraph.text:
-                                    paragraph.text = paragraph.text.replace(placeholder, clean_value)
+                        _replace_in_paragraph(paragraph, data)
                     for table in doc.tables:
-                        for trow in table.rows:
-                            for cell in trow.cells:
-                                for paragraph in cell.paragraphs:
-                                    for key, value in data.items():
-                                        placeholder = f"{{{{{key}}}}}"
-                                        if placeholder in paragraph.text:
-                                            paragraph.text = paragraph.text.replace(placeholder, str(value))
+                        _replace_in_table(table, data)
 
                     preview_docx = doc_dir / f"_preview_{data['Nom_fichier']}.docx"
                     doc.save(preview_docx)
@@ -537,31 +594,26 @@ def run_publipostage(
             pdf_to_attach = None
             if template_path:
                 doc = Document(template_path)
-
                 for paragraph in doc.paragraphs:
-                    for key, value in data.items():
-                        if pd.notna(value):
-                            clean_value = str(value).strip().replace('\n', ' ').replace('\r', '')
-                            placeholder = f"{{{{{key}}}}}"
-                            if placeholder in paragraph.text:
-                                paragraph.text = paragraph.text.replace(placeholder, clean_value)
-
+                    _replace_in_paragraph(paragraph, data)
                 for table in doc.tables:
-                    for trow in table.rows:
-                        for cell in trow.cells:
-                            for paragraph in cell.paragraphs:
-                                for key, value in data.items():
-                                    placeholder = f"{{{{{key}}}}}"
-                                    if placeholder in paragraph.text:
-                                        paragraph.text = paragraph.text.replace(placeholder, str(value))
-                                    else:
-                                        placeholder_with_spaces = f"{{{{ {key} }}}}"
-                                        if placeholder_with_spaces in paragraph.text:
-                                            paragraph.text = paragraph.text.replace(placeholder_with_spaces, str(value))
+                    _replace_in_table(table, data)
 
                 output_filename = f"fiche_PS_remplie_{data['Nom_fichier']}.docx"
                 output_path = doc_dir / output_filename
                 doc.save(output_path)
+                # Vérification des placeholders non remplacés
+
+                for para in doc.paragraphs:
+                    matches = re.findall(r'\{\{[^}]+\}\}', para.text)
+                    for m in matches:
+                        log(f"⚠️ Placeholder non remplacé : {m}")
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            matches = re.findall(r'\{\{[^}]+\}\}', cell.text)
+                            for m in matches:
+                                log(f"⚠️ Placeholder non remplacé : {m}")
                 log(f"Document Word généré pour {data['Nom_fichier']} : {output_path}")
 
                 pdf_path = pdf_dir / f"fiche_PS_remplie_{data['Nom_fichier']}.pdf"

@@ -499,6 +499,7 @@ def preview():
         has_pdf=bool(result.get("preview_pdf")),
         attachment_filenames=[p.name for p in p["attachment_paths"]],
         total_count=result.get("total_count", len(result.get("previews", []))),
+        logs=result.get("logs", []),
     )
 
 
