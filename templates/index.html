@@ -622,6 +622,53 @@
         </div>
     </section>
 
+    <!-- ── Suivi Brevo ── -->
+    <section>
+        <div class="section-label">Suivi des envois Brevo</div>
+        <div class="history-card">
+            <div class="history-head">
+                <span class="history-head-title">Derniers événements</span>
+                <button class="btn-ghost" onclick="loadBrevoStats()" style="padding:4px 10px;font-size:12px">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-4.36"/></svg>
+                    Rafraîchir
+                </button>
+            </div>
+
+            <div style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border-c);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="text" id="brevo-sender" placeholder="Expéditeur ex: ba220@cotesdarmor..."
+                    style="flex:1;padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+                <input type="text" id="brevo-email" placeholder="Destinataire"
+                    style="flex:1;padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+                <select id="brevo-event" style="padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+                    <option value="">Tous les événements</option>
+                    <option value="delivered">Délivré</option>
+                    <option value="opened">Ouvert</option>
+                    <option value="clicks">Cliqué</option>
+                    <option value="hardBounce">Hard bounce</option>
+                    <option value="softBounce">Soft bounce</option>
+                    <option value="blocked">Bloqué</option>
+                    <option value="spam">Spam</option>
+                </select>
+                <input type="date" id="brevo-start" style="padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+                <input type="date" id="brevo-end" style="padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+            </div>
+
+            <table id="brevo-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Destinataire</th>
+                        <th>Sujet</th>
+                        <th>Événement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" class="history-empty">Cliquez sur Rafraîchir pour charger les données Brevo.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- ── Fichiers de logs ── -->
     <section>
         <div class="section-label">Fichiers exportés</div>
@@ -921,6 +968,60 @@ async function deleteSelected(selectId, endpoint) {
         else if (selectId === 'email_template') loadEmailTemplateList();
     }
 }
+
+// ------------------ fonction loadBrevoStats -------------------------------------------
+// ------------------ ajoutée le 25102026 -----------------------------------------------
+function loadBrevoStats() {
+    const params = new URLSearchParams();
+    const sender = document.getElementById('brevo-sender').value.trim();
+    const email  = document.getElementById('brevo-email').value.trim();
+    const event  = document.getElementById('brevo-event').value;
+    const start  = document.getElementById('brevo-start').value;
+    const end    = document.getElementById('brevo-end').value;
+    if (sender) params.append('sender', sender);
+    if (email)  params.append('email', email);
+    if (event)  params.append('event', event);
+    if (start)  params.append('startDate', start);
+    if (end)    params.append('endDate', end);
+
+    fetch('/brevo/stats?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.querySelector('#brevo-table tbody');
+            if (data.error) {
+                tbody.innerHTML = `<tr><td colspan="4" class="history-empty">${data.error}</td></tr>`;
+                return;
+            }
+            const events = data.events || [];
+            if (events.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="history-empty">Aucun événement trouvé.</td></tr>';
+                return;
+            }
+            const eventLabel = {
+                'delivered': '<span class="badge badge-ok">✓ Délivré</span>',
+                'opened':    '<span class="badge badge-ok">👁 Ouvert</span>',
+                'clicks':    '<span class="badge badge-ok">🖱 Cliqué</span>',
+                'hardBounce':'<span class="badge badge-error">✕ Bounce</span>',
+                'softBounce':'<span class="badge badge-error">✕ Soft bounce</span>',
+                'blocked':   '<span class="badge badge-error">✕ Bloqué</span>',
+                'spam':      '<span class="badge badge-error">⚠ Spam</span>',
+                'invalid':   '<span class="badge badge-error">✕ Invalide</span>',
+            };
+            tbody.innerHTML = events.map(e => `
+                <tr>
+                    <td style="color:var(--ink3);font-size:12px">${e.date ? e.date.replace('T', ' ').slice(0,16) : '—'}</td>
+                    <td style="font-family:monospace;font-size:12px">${e.email || '—'}</td>
+                    <td style="font-size:12px">${e.subject || '—'}</td>
+                    <td>${eventLabel[e.event] || e.event}</td>
+                </tr>`).join('');
+        })
+        .catch(() => {
+            document.querySelector('#brevo-table tbody').innerHTML =
+                '<tr><td colspan="4" class="history-empty">Erreur de connexion à Brevo.</td></tr>';
+        });
+}
+
+
 </script>
 </body>
 </html>

@@ -90,6 +90,7 @@ load_dotenv(DATA_DIR / ".env", override=True)
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SMTP_FROM = os.getenv("SMTP_FROM")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
 print(f"🔍 SMTP_USER = '{SMTP_USER}'", flush=True)
 print(f"🔍 SMTP_FROM = '{SMTP_FROM}'", flush=True)
 if not SMTP_USER or not SMTP_PASSWORD:
@@ -462,6 +463,49 @@ def history():
         "statut": row[4]
     } for row in campagnes])
 
+@app.route('/brevo/stats')
+def brevo_stats():
+    """Récupère les événements des emails transactionnels depuis l'API Brevo."""
+    if not BREVO_API_KEY:
+        return jsonify({"error": "BREVO_API_KEY non configurée dans le .env"}), 400
+
+    import requests as req
+    try:
+        sender = request.args.get("sender", "").strip()
+        email_filter = request.args.get("email", "").strip()
+        event_filter = request.args.get("event", "").strip()
+        start_date = request.args.get("startDate", "").strip()
+        end_date = request.args.get("endDate", "").strip()
+
+        params = {"limit": 500, "sort": "desc"}
+        if email_filter:
+            params["email"] = email_filter
+        if event_filter:
+            params["event"] = event_filter
+        if start_date:
+            params["startDate"] = start_date
+        if end_date:
+            params["endDate"] = end_date
+
+        response = req.get(
+            "https://api.brevo.com/v3/smtp/statistics/events",
+            headers={"api-key": BREVO_API_KEY, "accept": "application/json"},
+            params=params,
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Filtre sur l'expéditeur côté Python
+        if sender and "events" in data:
+            data["events"] = [
+                e for e in data["events"]
+                if sender.lower() in (e.get("from", "") or "").lower()
+            ]
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/preview', methods=['POST'])
 def preview():
