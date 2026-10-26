@@ -5,6 +5,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 hidden_imports = [
     'email.mime.multipart', 'email.mime.text', 'email.mime.base',
     'publipostage_stock_ed7',
+    'requests',
     *collect_submodules('mammoth'),
 ]
 if sys.platform == "win32":
