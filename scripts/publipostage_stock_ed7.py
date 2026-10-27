@@ -315,7 +315,7 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
         payload["attachment"] = attachments
 
     try:
-        response = req.post(
+        response = requests.post(
             "https://api.brevo.com/v3/smtp/email",
             headers={"api-key": api_key, "content-type": "application/json"},
             json=payload,
