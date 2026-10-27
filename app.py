@@ -375,7 +375,11 @@ def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
     for pattern in ("log_*.txt", "statuts_*.csv"):
         files = sorted(logs_dir.glob(pattern), key=lambda f: f.stat().st_mtime)
         for old in files[:-keep]:
-            old.unlink(missing_ok=True)
+            try:
+                old.unlink(missing_ok=True)
+            except Exception:
+                pass  # fichier verrouillé ou permissions insuffisantes
+
 
 def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id, reply_to=None, attachment_paths=None):
     print(f"🔍 reply_to dans lancer_campagne = '{reply_to}'", flush=True)
