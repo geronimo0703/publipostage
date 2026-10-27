@@ -285,6 +285,8 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
         "to":       [{"email": r} for r in recipients],
         "subject":  subject,
         "htmlContent": corps,
+        "trackOpens":  True,
+        "trackClicks": True,
     }
     if reply_to:
         payload["replyTo"] = {"email": reply_to}
