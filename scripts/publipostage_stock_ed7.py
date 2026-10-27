@@ -55,6 +55,9 @@ import glob
 import traceback
 import time
 
+import base64
+import requests
+
 # --------------------------------------------------------------------------
 # Fonction chercher dynamiquement LibreOffice sur portables ou installés dans un dossier custom.
 # --------------------------------------------------------------------------
@@ -251,21 +254,20 @@ def normaliser_destinataires(raw_email):
 
 
 def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=None, personnaliser=False, log=print, extra_attachments=None):
-    smtp_user = smtp_config.get("user")
-    smtp_from = smtp_config.get("from", smtp_user)
-    smtp_password = smtp_config.get("password")
-    smtp_server = smtp_config.get("server", "smtp.gmail.com")
-    smtp_port = smtp_config.get("port", 587)
+    smtp_from = smtp_config.get("from") or smtp_config.get("user")
+    reply_to  = smtp_config.get("reply_to")
+    api_key   = smtp_config.get("api_key")
     print(f"🔍 smtp_from dans send_email = '{smtp_from}'", flush=True)
+    print(f"🔍 reply_to dans send_email = '{reply_to}'", flush=True)
 
-    if not smtp_user or not smtp_password:
-        msg_err = "SMTP_USER / SMTP_PASSWORD manquants (vérifie le fichier .env)"
+    if not api_key:
+        msg_err = "BREVO_API_KEY manquante (vérifie le fichier .env)"
         log(f"❌ {msg_err}")
         return False, msg_err
 
     if data is None:
         data = {}
-    data["reply_to"] = smtp_config.get("reply_to", "")
+    data["reply_to"] = reply_to or ""
 
     corps = lire_modele_email(modele_path, data=data, personnaliser=personnaliser, log=log)
     if corps is None:
@@ -277,45 +279,49 @@ def send_email(to_email_raw, subject, pdf_path, modele_path, smtp_config, data=N
     if not recipients:
         return False, "Aucune adresse email valide"
 
-    msg = MIMEMultipart()
-    msg["From"] = smtp_from
-    msg["To"] = ", ".join(recipients)
-    msg["Subject"] = subject
-    reply_to = smtp_config.get("reply_to")
-    print(f"🔍 reply_to dans send_email = '{reply_to}'", flush=True)
+    # Construction du payload API Brevo
+    payload = {
+        "sender":   {"email": smtp_from},
+        "to":       [{"email": r} for r in recipients],
+        "subject":  subject,
+        "htmlContent": corps,
+    }
     if reply_to:
-        msg["Reply-To"] = reply_to
-    msg.attach(MIMEText(corps, "html"))
+        payload["replyTo"] = {"email": reply_to}
 
-    # Pièce jointe PDF : uniquement si un chemin valide est fourni
+    # Pièces jointes en base64
+    attachments = []
     if pdf_path and Path(pdf_path).exists():
         with open(pdf_path, "rb") as f:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(f.read())
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f"attachment; filename={Path(pdf_path).name}")
-            msg.attach(part)
+            attachments.append({
+                "name": Path(pdf_path).name,
+                "content": base64.b64encode(f.read()).decode()
+            })
         log(f"📎 Pièce jointe : {Path(pdf_path).name}")
     else:
         log("📧 Envoi sans pièce jointe")
 
-        # Pièces jointes génériques communes
     for att_path in (extra_attachments or []):
         att_path = Path(att_path)
         if att_path.exists():
             with open(att_path, "rb") as f:
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(f.read())
-                encoders.encode_base64(part)
-                part.add_header("Content-Disposition", f"attachment; filename={att_path.name}")
-                msg.attach(part)
+                attachments.append({
+                    "name": att_path.name,
+                    "content": base64.b64encode(f.read()).decode()
+                })
             log(f"📎 Pièce jointe générique : {att_path.name}")
 
+    if attachments:
+        payload["attachment"] = attachments
+
     try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, recipients, msg.as_string())
+        response = req.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": api_key, "content-type": "application/json"},
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
         log(f"✉️ E-mail envoyé à {', '.join(recipients)}")
         return True, ""
     except Exception as e:
@@ -374,6 +380,7 @@ def run_publipostage(
     smtp_port: int = 587,
     smtp_from: str = None,
     reply_to: str = None,
+    api_key: str = None,
     attachment_paths: list = None,
     dry_run: bool = False,
     preview_count: int = None,
@@ -420,6 +427,7 @@ def run_publipostage(
         "port": smtp_port,
         "from": smtp_from or smtp_user,
         "reply_to": reply_to,
+        "api_key": api_key,
     }
 
     logs = []

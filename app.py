@@ -403,6 +403,7 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
             smtp_port=SMTP_PORT,
             smtp_from=SMTP_FROM,
             reply_to=reply_to,
+            api_key=BREVO_API_KEY,
             attachment_paths=attachment_paths or [],
         )
         statut = "Terminé" if result["success"] else "Erreur"
@@ -533,6 +534,7 @@ def preview():
         smtp_port=SMTP_PORT,
         smtp_from=SMTP_FROM,
         reply_to=p["reply_to"],
+        api_key=BREVO_API_KEY,
         dry_run=True,
         preview_count=preview_count,
     )
