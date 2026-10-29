@@ -628,7 +628,7 @@
         <div class="history-card">
             <div class="history-head">
                 <span class="history-head-title">Derniers événements</span>
-                <button class="btn-ghost" onclick="loadBrevoStats()" style="padding:4px 10px;font-size:12px">
+                <button class="btn-ghost" onclick="loadBrevoStats(); loadBrevoSynthese()" style="padding:4px 10px;font-size:12px">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.08-4.36"/></svg>
                     Rafraîchir
                 </button>
@@ -651,6 +651,10 @@
                 </select>
                 <input type="date" id="brevo-start" style="padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
                 <input type="date" id="brevo-end" style="padding:5px 10px;border:1px solid var(--border-c);border-radius:var(--r-sm);font-size:13px;">
+            </div>
+
+            <div id="brevo-synthese" style="padding:.75rem 1.25rem;border-bottom:1px solid var(--border-c);">
+                <span style="font-size:12px;color:var(--ink3)">Cliquez sur Rafraîchir pour calculer la synthèse.</span>
             </div>
 
             <table id="brevo-table">
@@ -758,23 +762,43 @@ document.addEventListener('DOMContentLoaded', function () {
                     container.innerHTML = '<span style="font-size:12px;color:var(--ink3)">Aucune pièce jointe disponible</span>';
                     return;
                 }
-                container.innerHTML = files.map(f => `
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                    <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer;flex:1;">
-                        <input type="checkbox" name="attachments" value="${f}"
-                                style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);">
-                        ${f}
-                    </label>
-                    <button type="button" onclick="deleteAttachment('${f}')"
-                            style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;"
-                            title="Supprimer">✕</button>
-                </div>`).join('');
+                const toutSelectionner = `
+                    <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink2);cursor:pointer;padding-bottom:6px;border-bottom:1px solid var(--border-c);">
+                        <input type="checkbox" id="attachments-all" onchange="toggleAllAttachments(this.checked)"
+                               style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);">
+                        Tout sélectionner (${files.length})
+                    </label>`;
+                container.innerHTML = toutSelectionner + files.map(f => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);cursor:pointer;flex:1;">
+                            <input type="checkbox" name="attachments" value="${f}" onchange="syncAllAttachments()"
+                                   style="width:15px;height:15px;cursor:pointer;accent-color:var(--blue);">
+                            ${f}
+                        </label>
+                        <button type="button" onclick="deleteAttachment('${f}')"
+                                style="border:none;background:none;cursor:pointer;color:var(--red);font-size:16px;padding:0 4px;"
+                                title="Supprimer ce fichier de la liste">✕</button>
+                    </div>`).join('');
             })
             .catch(() => {
                 document.getElementById('attachments-list').innerHTML =
                     '<span style="font-size:12px;color:var(--red)">Erreur de chargement</span>';
             });
     }
+
+    function toggleAllAttachments(checked) {
+        document.querySelectorAll('#attachments-list input[name="attachments"]')
+                .forEach(cb => cb.checked = checked);
+    }
+
+    function syncAllAttachments() {
+        const boxes = [...document.querySelectorAll('#attachments-list input[name="attachments"]')];
+        const all = document.getElementById('attachments-all');
+        if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked);
+    }
+
+    window.toggleAllAttachments = toggleAllAttachments;
+    window.syncAllAttachments = syncAllAttachments;
 
     function deleteAttachment(filename) {
         if (!confirm(`Supprimer "${filename}" ?`)) return;
@@ -1021,6 +1045,57 @@ function loadBrevoStats() {
         });
 }
 
+
+function loadBrevoSynthese() {
+    const params = new URLSearchParams();
+    const sender = document.getElementById('brevo-sender').value.trim();
+    const start  = document.getElementById('brevo-start').value;
+    const end    = document.getElementById('brevo-end').value;
+    if (sender) params.append('sender', sender);
+    if (start)  params.append('startDate', start);
+    if (end)    params.append('endDate', end);
+
+    const box = document.getElementById('brevo-synthese');
+    box.innerHTML = '<span style="font-size:12px;color:var(--ink3)">Calcul en cours…</span>';
+
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const pct = (a, b) => b ? ` (${Math.round(100 * a / b)} %)` : '';
+    const bloc = (label, valeur) => `
+        <div style="min-width:90px;">
+            <div style="font-size:11px;color:var(--ink3);text-transform:uppercase;">${label}</div>
+            <div style="font-size:16px;font-weight:600;color:var(--ink);">${valeur}</div>
+        </div>`;
+
+    fetch('/brevo/synthese?' + params.toString())
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { box.textContent = data.error; return; }
+            if (!data.expediteurs.length) { box.textContent = 'Aucun événement sur la période.'; return; }
+            box.innerHTML = data.expediteurs.map(x => {
+                const c = x.counts;
+                const somme = re => Object.keys(c).filter(k => re.test(k)).reduce((s, k) => s + c[k], 0);
+                const envoyes   = c.requests  || 0;
+                const delivres  = c.delivered || 0;
+                const ouverts   = c.opened    || 0;
+                const cliques   = c.clicks    || 0;
+                const bounces   = somme(/bounce/i);
+                const bloques   = somme(/^(blocked|invalid|spam|error)$/i);
+                return `
+                    <div style="margin-bottom:10px;">
+                        <div style="font-size:13px;font-weight:600;font-family:monospace;margin-bottom:6px;">${esc(x.from)}</div>
+                        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+                            ${bloc('Envoyés', envoyes)}
+                            ${bloc('Délivrés', delivres + pct(delivres, envoyes))}
+                            ${bloc('Ouverts', ouverts + pct(ouverts, delivres))}
+                            ${bloc('Cliqués', cliques + pct(cliques, delivres))}
+                            ${bloc('Bounces', bounces)}
+                            ${bloc('Bloqués / spam', bloques)}
+                        </div>
+                    </div>`;
+            }).join('');
+        })
+        .catch(() => { box.textContent = 'Erreur de connexion à Brevo.'; });
+}
 
 </script>
 </body>

@@ -22,6 +22,7 @@ import webbrowser
 import threading
 import signal
 import mammoth
+import requests
 
 APP_NAME = "Publipostage"
 APP_AUTHOR = "BanqueAlimentaire22"
@@ -511,6 +512,60 @@ def brevo_stats():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _brevo_fetch_events(params, max_pages=40, page_size=500):
+    """Récupère tous les événements Brevo en paginant (offset)."""
+    events = []
+    offset = 0
+    for _ in range(max_pages):
+        p = dict(params, limit=page_size, offset=offset, sort="desc")
+        r = requests.get(
+            "https://api.brevo.com/v3/smtp/statistics/events",
+            headers={"api-key": BREVO_API_KEY, "accept": "application/json"},
+            params=p,
+            timeout=15,
+        )
+        r.raise_for_status()
+        batch = r.json().get("events", [])
+        if not batch:
+            break
+        events.extend(batch)
+        offset += len(batch)
+    return events
+
+
+@app.route('/brevo/synthese')
+def brevo_synthese():
+    """Synthèse par expéditeur : nombre de messages uniques par type d'événement."""
+    if not BREVO_API_KEY:
+        return jsonify({"error": "BREVO_API_KEY non configurée dans le .env"}), 400
+
+    sender = request.args.get("sender", "").strip().lower()
+    params = {}
+    if request.args.get("startDate"):
+        params["startDate"] = request.args["startDate"]
+    if request.args.get("endDate"):
+        params["endDate"] = request.args["endDate"]
+
+    try:
+        events = _brevo_fetch_events(params)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    par_expediteur = {}
+    for e in events:
+        exp = (e.get("from") or "—").lower()
+        if sender and sender not in exp:
+            continue
+        cle = (e.get("messageId"), e.get("email"))
+        par_expediteur.setdefault(exp, {}).setdefault(e.get("event", "?"), set()).add(cle)
+
+    resultat = [
+        {"from": exp, "counts": {ev: len(cles) for ev, cles in evs.items()}}
+        for exp, evs in sorted(par_expediteur.items())
+    ]
+    return jsonify({"expediteurs": resultat, "total_events": len(events)})
 
 @app.route('/preview', methods=['POST'])
 def preview():
