@@ -379,11 +379,25 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
                 Aide
             </a>
+            {% if auth_enabled and current_user %}
+            <span class="app-sub" title="Compte connecté">{{ current_user.email }}</span>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('auth.admin_users') }}" class="btn-ghost">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Administration
+            </a>
+            {% endif %}
+            <a href="{{ url_for('auth.logout') }}" class="btn-ghost">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
+                Se déconnecter
+            </a>
+            {% else %}
             <button class="btn-ghost"
                     onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
                 Quitter
             </button>
+            {% endif %}
         </div>
     </div>
 
@@ -586,11 +600,13 @@
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                         Lancer
                     </button>
+                    {% if not auth_enabled %}
                     <button type="button" class="btn-action btn-exit"
                             onclick="if(confirm('Fermer l\'application ?')) fetch('/shutdown', {method:'POST'}).then(() => window.close())">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
                         Quitter
                     </button>
+                    {% endif %}
                 </div>
 
             </div>
@@ -622,7 +638,8 @@
         </div>
     </section>
 
-    <!-- ── Suivi Brevo ── -->
+    <!-- ── Suivi Brevo (admins seulement en version web) ── -->
+    {% if not auth_enabled or (current_user and current_user.is_admin) %}
     <section>
         <div class="section-label">Suivi des envois Brevo</div>
         <div class="history-card">
@@ -672,6 +689,7 @@
             </table>
         </div>
     </section>
+    {% endif %}
 
     <!-- ── Fichiers de logs ── -->
     <section>

@@ -272,6 +272,7 @@ def index():
         'index.html',
         default_send_emails=DEFAULT_SEND_EMAILS,
         build_version=BUILD_VERSION,
+        auth_enabled=AUTH_ENABLED,
     )
 
 @app.route('/version')
