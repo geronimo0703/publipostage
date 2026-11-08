@@ -6,9 +6,12 @@
 #   ed2 : with_attachment : le template .docx (et le PDF généré) sont
 #          optionnels — si la case est décochée dans le formulaire,
 #          aucun document n'est généré ni joint à l'email.
+#   web1 : espaces séparés (shared/ + users/<adresse>/) si AUTH_ENABLED=1,
+#          campagnes rattachées à leur compte, noms de fichiers contrôlés,
+#          /shutdown désactivé et stats Brevo réservées aux admins sur le web.
 #
 # ==============================================================================
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_file
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_file, g, abort
 from werkzeug.utils import secure_filename
 
 import os
@@ -25,6 +28,8 @@ import signal
 import mammoth
 import requests
 import secrets
+import re
+from types import SimpleNamespace
 
 APP_NAME = "Publipostage"
 APP_AUTHOR = "BanqueAlimentaire22"
@@ -62,7 +67,6 @@ app = Flask(
     template_folder=str(RESOURCE_DIR / "templates"),
     static_folder=str(RESOURCE_DIR / "static"),
 )
-app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
@@ -71,22 +75,12 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 # --------------------------------------------
 DATA_DIR = Path(user_data_dir(APP_NAME, APP_AUTHOR))
 
-CSV_DIR = DATA_DIR / config["paths"]["csv_dir"]
-DOCUMENT_TEMPLATES_DIR = DATA_DIR / config["paths"]["document_templates_dir"]
-MESSAGE_TEMPLATES_DIR = DATA_DIR / config["paths"]["message_templates_dir"]
-PDF_DIR = DATA_DIR / config["paths"]["pdf_dir"]
-DOC_DIR = DATA_DIR / config["paths"]["doc_dir"]
-LOGS_DIR = DATA_DIR / config["paths"]["logs_dir"]
 DB_PATH = DATA_DIR / config["database"]["path"]
 DB_TABLE = config["database"]["table_name"]
-ATTACHMENT_DIR = DATA_DIR / config["paths"]["attachments_dir"]
-ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_TEMPLATE_NAME = config["default_files"]["template_file"]
 DEFAULT_SEND_EMAILS = config["processing"].get("send_emails_default", False)
-
-for d in (CSV_DIR, DOCUMENT_TEMPLATES_DIR, MESSAGE_TEMPLATES_DIR, PDF_DIR, DOC_DIR, LOGS_DIR, DB_PATH.parent):
-    d.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------
 # Identifiants SMTP
@@ -103,9 +97,78 @@ else:
 SMTP_SERVER = os.getenv("SMTP_SERVER") or config.get("email", {}).get("smtp_server", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT") or config.get("email", {}).get("smtp_port", 587))
 
-# ajout pour passage sur web
-from auth import init_auth
-init_auth(app)
+# Clé Flask : lue APRÈS le chargement du .env (sinon une clé aléatoire était
+# générée à chaque démarrage sur le PC)
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+
+# --------------------------------------------
+# Authentification (version web) — désactivable pour l'usage local sur PC
+# --------------------------------------------
+AUTH_ENABLED = os.getenv("AUTH_ENABLED", "1") == "1"
+if AUTH_ENABLED:
+    from auth import init_auth, admin_required
+    init_auth(app)
+else:
+    def admin_required():
+        return None
+
+
+# --------------------------------------------
+# Espaces de travail
+#   - AUTH_ENABLED=0 (PC) : disposition historique, tout sous DATA_DIR
+#   - AUTH_ENABLED=1 (web) : DATA_DIR/shared pour les modèles et pièces
+#     jointes communs, DATA_DIR/users/<adresse> pour les CSV, PDF, DOCX
+#     générés et logs de chaque compte
+# --------------------------------------------
+SHARED_KEEP = 50    # modèles partagés : purge large, ils servent à tous
+USER_KEEP = 5
+
+def _user_key():
+    """Identifiant du compte connecté, utilisable comme nom de dossier."""
+    user = g.get("user") if AUTH_ENABLED else None
+    if not user:
+        return None
+    return re.sub(r"[^a-z0-9@._-]", "_", user["email"].lower())
+
+
+def _dirs_for(user_key):
+    """Dossiers de travail pour un compte (None = disposition PC historique)."""
+    paths = config["paths"]
+    if AUTH_ENABLED and user_key:
+        shared = DATA_DIR / "shared"
+        own = DATA_DIR / "users" / user_key
+    else:
+        shared = own = DATA_DIR
+    d = SimpleNamespace(
+        csv=own / paths["csv_dir"],
+        pdf=own / paths["pdf_dir"],
+        doc=own / paths["doc_dir"],
+        logs=own / paths["logs_dir"],
+        documents=shared / paths["document_templates_dir"],
+        messages=shared / paths["message_templates_dir"],
+        attachments=shared / paths["attachments_dir"],
+    )
+    for p in vars(d).values():
+        p.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def dirs():
+    """Dossiers de l'utilisateur de la requête en cours (créés si besoin)."""
+    if "dirs" not in g:
+        g.dirs = _dirs_for(_user_key())
+    return g.dirs
+
+
+def _child(directory: Path, filename):
+    """Fichier `filename` DANS `directory` — refuse tout chemin (../, /...)."""
+    if not filename:
+        return None
+    name = Path(filename).name
+    if name != filename or name in {"", ".", ".."}:
+        abort(400)
+    return directory / name
+
 
 def init_db():
     conn = sqlite3.connect(str(DB_PATH))
@@ -120,8 +183,21 @@ def init_db():
             logs TEXT
         )
     ''')
+    cols = [r[1] for r in c.execute(f"PRAGMA table_info({DB_TABLE})")]
+    if "utilisateur" not in cols:
+        c.execute(f"ALTER TABLE {DB_TABLE} ADD COLUMN utilisateur TEXT")
     conn.commit()
     conn.close()
+
+
+def _owns_campaign(campaign_id):
+    """La campagne appartient-elle au compte connecté ? (toujours vrai sur PC)"""
+    if not AUTH_ENABLED:
+        return True
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute(f"SELECT utilisateur FROM {DB_TABLE} WHERE id = ?", (campaign_id,)).fetchone()
+    conn.close()
+    return bool(row) and row[0] == _user_key()
 
 
 init_db()
@@ -148,13 +224,14 @@ def _parse_form_params(form):
 
         # Pièces jointes génériques (multi-sélection)
     attachment_filenames = form.getlist('attachments')
-    attachment_paths = [ATTACHMENT_DIR / f for f in attachment_filenames if f]
+    d = dirs()
+    attachment_paths = [_child(d.attachments, f) for f in attachment_filenames if f]
     print(f"🔍 attachment_filenames = {attachment_filenames}", flush=True)
     print(f"🔍 attachment_paths = {attachment_paths}", flush=True)
 
-    csv_path = CSV_DIR / csv_filename if csv_filename else None
-    docx_path = DOCUMENT_TEMPLATES_DIR / docx_filename if docx_filename else None
-    email_template_path = MESSAGE_TEMPLATES_DIR / email_template_filename if email_template_filename else None
+    csv_path = _child(d.csv, csv_filename)
+    docx_path = _child(d.documents, docx_filename)
+    email_template_path = _child(d.messages, email_template_filename)
     reply_to = form.get("reply_to") or None
 
     return {
@@ -182,7 +259,9 @@ def help_page():
 
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
-    """Arrête le serveur Flask proprement."""
+    """Arrête le serveur Flask proprement (usage local uniquement)."""
+    if AUTH_ENABLED:
+        abort(404)
     os.kill(os.getpid(), signal.SIGTERM)
     return ("", 204)
 
@@ -203,7 +282,7 @@ def version():
 @app.route('/list/csv')
 def list_csv_files():
     files = sorted(
-        f.name for f in CSV_DIR.iterdir()
+        f.name for f in dirs().csv.iterdir()
         if f.suffix.lower() in {'.csv', '.xlsx', '.xls'}
     )
     return jsonify(files)
@@ -211,13 +290,13 @@ def list_csv_files():
 
 @app.route('/list/templates')
 def list_template_files():
-    files = sorted(f.name for f in DOCUMENT_TEMPLATES_DIR.glob("*.docx"))
+    files = sorted(f.name for f in dirs().documents.glob("*.docx"))
     return jsonify(files)
 
 @app.route('/list/attachments')
 def list_attachments():
     files = sorted(
-        f.name for f in ATTACHMENT_DIR.iterdir()
+        f.name for f in dirs().attachments.iterdir()
         if f.suffix.lower() in {'.pdf', '.docx'}
     )
     return jsonify(files)
@@ -226,16 +305,16 @@ def list_attachments():
 @app.route('/upload/attachment', methods=['POST'])
 def upload_attachment():
     success, message = _save_uploaded_file(
-        request.files.get('file'), ATTACHMENT_DIR, {'.pdf', '.docx'}
+        request.files.get('file'), dirs().attachments, {'.pdf', '.docx'}
     )
     if success:
-        _purge_old_uploads(ATTACHMENT_DIR, ("*.pdf", "*.docx"), keep=10)
+        _purge_old_uploads(dirs().attachments, ("*.pdf", "*.docx"), keep=SHARED_KEEP)
     return jsonify({"success": success, "message": message})
 
 @app.route('/delete/attachment/<filename>', methods=['POST'])
 def delete_attachment(filename):
-    path = ATTACHMENT_DIR / filename
-    if path.exists() and path.parent == ATTACHMENT_DIR:
+    path = _child(dirs().attachments, filename)
+    if path.exists():
         path.unlink()
         return jsonify({"success": True, "message": f"{filename} supprimé"})
     return jsonify({"success": False, "message": "Fichier introuvable"})
@@ -244,28 +323,24 @@ def delete_attachment(filename):
 
 
 def delete_csv(filename):
-    path = CSV_DIR / filename
-    if path.exists() and path.parent == CSV_DIR:
+    path = _child(dirs().csv, filename)
+    if path.exists():
         path.unlink()
         return jsonify({"success": True, "message": f"{filename} supprimé"})
     return jsonify({"success": False, "message": "Fichier introuvable"})
 
 @app.route('/delete/template/<filename>', methods=['POST'])
 def delete_template(filename):
-    path = DOCUMENT_TEMPLATES_DIR / filename
-    if path.exists() and path.parent == DOCUMENT_TEMPLATES_DIR:
+    path = _child(dirs().documents, filename)
+    if path.exists():
         path.unlink()
         return jsonify({"success": True, "message": f"{filename} supprimé"})
     return jsonify({"success": False, "message": "Fichier introuvable"})
 
 @app.route('/delete/email_template/<filename>', methods=['POST'])
 def delete_email_template(filename):
-    path = MESSAGE_TEMPLATES_DIR / filename
-    if path.exists() and path.parent == MESSAGE_TEMPLATES_DIR:
-        path.unlink()
-        return jsonify({"success": True, "message": f"{filename} supprimé"})
-    return jsonify({"success": False, "message": "Fichier introuvable"})
-    if path.exists() and path.parent == ATTACHMENT_DIR:
+    path = _child(dirs().messages, filename)
+    if path.exists():
         path.unlink()
         return jsonify({"success": True, "message": f"{filename} supprimé"})
     return jsonify({"success": False, "message": "Fichier introuvable"})
@@ -273,7 +348,7 @@ def delete_email_template(filename):
 @app.route('/list/email_templates')
 def list_email_templates():
     files = sorted(
-        f.name for f in MESSAGE_TEMPLATES_DIR.iterdir()
+        f.name for f in dirs().messages.iterdir()
         if f.suffix.lower() in {'.html', '.docx'}
     )
     return jsonify(files)
@@ -294,26 +369,26 @@ def _save_uploaded_file(file_storage, target_dir: Path, allowed_extensions):
 @app.route('/upload/csv', methods=['POST'])
 def upload_csv():
     success, message = _save_uploaded_file(
-        request.files.get('file'), CSV_DIR, {'.csv', '.xlsx', '.xls'}
+        request.files.get('file'), dirs().csv, {'.csv', '.xlsx', '.xls'}
     )
     if success:
-        _purge_old_uploads(CSV_DIR, ("*.csv", "*.xlsx", "*.xls"), keep=5)
+        _purge_old_uploads(dirs().csv, ("*.csv", "*.xlsx", "*.xls"), keep=USER_KEEP)
     return jsonify({"success": success, "message": message})
 
 
 @app.route('/upload/template', methods=['POST'])
 def upload_template():
-    success, message = _save_uploaded_file(request.files.get('file'), DOCUMENT_TEMPLATES_DIR, {'.docx'})
+    success, message = _save_uploaded_file(request.files.get('file'), dirs().documents, {'.docx'})
     if success:
-        _purge_old_uploads(DOCUMENT_TEMPLATES_DIR, ("*.docx",), keep=5)
+        _purge_old_uploads(dirs().documents, ("*.docx",), keep=SHARED_KEEP)
     return jsonify({"success": success, "message": message})
 
 
 @app.route('/upload/email_template', methods=['POST'])
 def upload_email_template():
-    success, message = _save_uploaded_file(request.files.get('file'), MESSAGE_TEMPLATES_DIR, {'.html', '.docx'})
+    success, message = _save_uploaded_file(request.files.get('file'), dirs().messages, {'.html', '.docx'})
     if success:
-        _purge_old_uploads(MESSAGE_TEMPLATES_DIR, ("*.html", "*.docx"), keep=5)
+        _purge_old_uploads(dirs().messages, ("*.html", "*.docx"), keep=SHARED_KEEP)
     return jsonify({"success": success, "message": message})
 
 
@@ -337,9 +412,9 @@ def upload_files():
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
     c.execute(f'''
-        INSERT INTO {DB_TABLE} (date, fichier_csv, template_docx, statut, logs)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), p["csv_filename"], template_label, "En attente", ""))
+        INSERT INTO {DB_TABLE} (date, fichier_csv, template_docx, statut, logs, utilisateur)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), p["csv_filename"], template_label, "En attente", "", _user_key()))
     campaign_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -351,7 +426,7 @@ def upload_files():
             p["csv_path"], p["docx_path"],
             p["send_emails"], True,
             p["email_template_path"], campaign_id,
-            p["reply_to"], p["attachment_paths"],
+            p["reply_to"], p["attachment_paths"], dirs(),
         ),
         daemon=True,
     ).start()
@@ -387,7 +462,7 @@ def _purge_old_logs(logs_dir: Path, keep: int = 3) -> None:
                 pass  # fichier verrouillé ou permissions insuffisantes
 
 
-def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id, reply_to=None, attachment_paths=None):
+def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_template_path, campaign_id, reply_to=None, attachment_paths=None, d=None):
     print(f"🔍 reply_to dans lancer_campagne = '{reply_to}'", flush=True)
     campaign_logs[campaign_id]["status"] = "En cours"
     label = docx_path.name if docx_path else "mail seul"
@@ -397,9 +472,9 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
         result = run_publipostage(
             csv_path=csv_path,
             template_path=docx_path,        # None = mail sans pièce jointe
-            pdf_dir=PDF_DIR,
-            doc_dir=DOC_DIR,
-            logs_dir=LOGS_DIR,
+            pdf_dir=d.pdf,
+            doc_dir=d.doc,
+            logs_dir=d.logs,
             send_emails=send_emails,
             personalize=personalize,
             email_template_path=email_template_path,
@@ -424,29 +499,31 @@ def lancer_campagne(csv_path, docx_path, send_emails, personalize, email_templat
         _update_campaign(campaign_id, "Erreur", logs)
 
     finally:                                       # on ne garde que les 3 dernières campagnes
-        _purge_old_logs(LOGS_DIR, keep=3)
+        _purge_old_logs(d.logs, keep=3)
 
 @app.route('/logs/files')
 def list_log_files():
-    """Liste les fichiers log_*.txt et statuts_*.csv dans LOGS_DIR."""
+    """Liste les fichiers log_*.txt et statuts_*.csv du dossier de logs du compte."""
     files = []
     for pattern in ("log_*.txt", "statuts_*.csv"):
-        for f in sorted(LOGS_DIR.glob(pattern), key=lambda x: x.stat().st_mtime, reverse=True):
+        for f in sorted(dirs().logs.glob(pattern), key=lambda x: x.stat().st_mtime, reverse=True):
             files.append({"name": f.name, "size": f.stat().st_size})
     return jsonify(files)
 
 
 @app.route('/logs/files/<filename>')
 def download_log_file(filename):
-    """Télécharge un fichier log ou statuts depuis LOGS_DIR."""
+    """Télécharge un fichier log ou statuts depuis le dossier de logs du compte."""
     safe = secure_filename(filename)
-    path = LOGS_DIR / safe
+    path = dirs().logs / safe
     if not path.exists() or not (safe.startswith("log_") or safe.startswith("statuts_")):
         return "Fichier introuvable", 404
     return send_file(path, as_attachment=True)
 
 @app.route('/logs/<int:campaign_id>')
 def get_logs(campaign_id):
+    if not _owns_campaign(campaign_id):
+        return jsonify({"logs": [], "status": "Inconnu"})
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
     c.execute(f'SELECT logs, statut FROM {DB_TABLE} WHERE id = ?', (campaign_id,))
@@ -463,7 +540,10 @@ def get_logs(campaign_id):
 def history():
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
-    c.execute(f'SELECT * FROM {DB_TABLE} ORDER BY date DESC LIMIT 3')
+    if AUTH_ENABLED:
+        c.execute(f'SELECT * FROM {DB_TABLE} WHERE utilisateur = ? ORDER BY date DESC LIMIT 3', (_user_key(),))
+    else:
+        c.execute(f'SELECT * FROM {DB_TABLE} ORDER BY date DESC LIMIT 3')
     campagnes = c.fetchall()
     conn.close()
     return jsonify([{
@@ -477,6 +557,7 @@ def history():
 @app.route('/brevo/stats')
 def brevo_stats():
     """Récupère les événements des emails transactionnels depuis l'API Brevo."""
+    admin_required()   # tous les envois partent du même expéditeur : réservé aux admins
     if not BREVO_API_KEY:
         return jsonify({"error": "BREVO_API_KEY non configurée dans le .env"}), 400
 
@@ -543,6 +624,7 @@ def _brevo_fetch_events(params, max_pages=40, page_size=500):
 @app.route('/brevo/synthese')
 def brevo_synthese():
     """Synthèse par expéditeur : nombre de messages uniques par type d'événement."""
+    admin_required()
     if not BREVO_API_KEY:
         return jsonify({"error": "BREVO_API_KEY non configurée dans le .env"}), 400
 
@@ -582,9 +664,9 @@ def preview():
     result = run_publipostage(
         csv_path=p["csv_path"],
         template_path=p["docx_path"],       # None si pas de pièce jointe
-        pdf_dir=PDF_DIR,
-        doc_dir=DOC_DIR,
-        logs_dir=LOGS_DIR,
+        pdf_dir=dirs().pdf,
+        doc_dir=dirs().doc,
+        logs_dir=dirs().logs,
         send_emails=p["send_emails"],
         personalize=True,
         email_template_path=p["email_template_path"],
@@ -618,16 +700,22 @@ def preview_pdf():
     pdf_path = session.get('preview_pdf')
     if not pdf_path or not Path(pdf_path).exists():
         return "PDF non disponible", 404
+    if dirs().pdf.resolve() not in Path(pdf_path).resolve().parents:
+        abort(403)
     return send_file(pdf_path, mimetype='application/pdf')
 
 
 @app.route('/campaign/<int:campaign_id>')
 def campaign_result(campaign_id):
+    if not _owns_campaign(campaign_id):
+        abort(404)
     return render_template('campaign_result.html', campaign_id=campaign_id)
 
 
 @app.route('/campaign/<int:campaign_id>/download-log')
 def download_log(campaign_id):
+    if not _owns_campaign(campaign_id):
+        abort(404)
     conn = sqlite3.connect(str(DB_PATH))
     c = conn.cursor()
     c.execute(f'SELECT logs FROM {DB_TABLE} WHERE id = ?', (campaign_id,))
