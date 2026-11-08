@@ -1,0 +1,33 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      # base des connexions (auth.db)
+      - ./data:/app/data
+      # données de l'application (modèles, CSV, PDF, logs) — à confirmer
+      - ./userdata:/home/app/.local/share/Publipostage
+    ports:
+      # accessible uniquement depuis la machine elle-même (tests locaux) ;
+      # depuis Internet, on passe par Caddy
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    # Caddy ne sert qu'en production (il lui faut le vrai domaine)
+    profiles: ["prod"]
+
+volumes:
+  caddy_data:
+  caddy_config:

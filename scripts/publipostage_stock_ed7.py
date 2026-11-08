@@ -43,6 +43,8 @@ from pathlib import Path
 import shutil
 import glob
 import re
+import tempfile
+import threading
 
 import pandas as pd
 from docx import Document
@@ -182,9 +184,12 @@ def convert_docx_to_pdf(docx_path: Path, pdf_path: Path, log) -> None:
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
+            profile_dir = Path(tempfile.gettempdir()) / f"lo_profile_{threading.get_ident()}"
             subprocess.run(
                 [
-                    soffice_bin, "--headless", "--norestore", "--nofirststartwizard",
+                    soffice_bin,
+                    f"-env:UserInstallation={profile_dir.as_uri()}",
+                    "--headless", "--norestore", "--nofirststartwizard",
                     "--convert-to", "pdf",
                     "--outdir", str(pdf_path.parent), str(docx_path),
                 ],

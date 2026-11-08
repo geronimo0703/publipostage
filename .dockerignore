@@ -1,0 +1,12 @@
+.git
+.github
+.env
+data/
+userdata/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+.venv/
+venv/
