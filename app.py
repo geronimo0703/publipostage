@@ -10,6 +10,7 @@
 # ==============================================================================
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, send_file
 from werkzeug.utils import secure_filename
+
 import os
 import sqlite3
 import yaml
@@ -23,6 +24,7 @@ import threading
 import signal
 import mammoth
 import requests
+import secrets
 
 APP_NAME = "Publipostage"
 APP_AUTHOR = "BanqueAlimentaire22"
@@ -60,7 +62,7 @@ app = Flask(
     template_folder=str(RESOURCE_DIR / "templates"),
     static_folder=str(RESOURCE_DIR / "static"),
 )
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "publipostage-dev-key")
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 
 # --------------------------------------------
 # Répertoire des données utilisateur (écriture, persistant)
@@ -101,6 +103,9 @@ else:
 SMTP_SERVER = os.getenv("SMTP_SERVER") or config.get("email", {}).get("smtp_server", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT") or config.get("email", {}).get("smtp_port", 587))
 
+# ajout pour passage sur web
+from auth import init_auth
+init_auth(app)
 
 def init_db():
     conn = sqlite3.connect(str(DB_PATH))
