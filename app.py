@@ -63,6 +63,8 @@ app = Flask(
     static_folder=str(RESOURCE_DIR / "static"),
 )
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --------------------------------------------
 # Répertoire des données utilisateur (écriture, persistant)
@@ -89,17 +91,15 @@ for d in (CSV_DIR, DOCUMENT_TEMPLATES_DIR, MESSAGE_TEMPLATES_DIR, PDF_DIR, DOC_D
 # --------------------------------------------
 # Identifiants SMTP
 # --------------------------------------------
-load_dotenv(DATA_DIR / ".env", override=True)
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+load_dotenv(DATA_DIR / ".env", override=False)
+SMTP_USER = os.getenv("SMTP_USER")          # obsolète depuis l'API Brevo, conservé pour compatibilité
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")  # idem
 SMTP_FROM = os.getenv("SMTP_FROM")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
-print(f"🔍 SMTP_USER = '{SMTP_USER}'", flush=True)
-print(f"🔍 SMTP_FROM = '{SMTP_FROM}'", flush=True)
-if not SMTP_USER or not SMTP_PASSWORD:
-    print(f"⚠️  SMTP non configuré — fichier .env attendu ici : {DATA_DIR / '.env'}", flush=True)
+if not BREVO_API_KEY or not SMTP_FROM:
+    print(f"⚠️  Brevo non configuré (BREVO_API_KEY ou SMTP_FROM manquant) — .env attendu ici : {DATA_DIR / '.env'}", flush=True)
 else:
-    print(f"✅ SMTP chargé pour : {SMTP_USER}", flush=True)
+    print(f"✅ Brevo configuré, expéditeur : {SMTP_FROM}", flush=True)
 SMTP_SERVER = os.getenv("SMTP_SERVER") or config.get("email", {}).get("smtp_server", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT") or config.get("email", {}).get("smtp_port", 587))
 
