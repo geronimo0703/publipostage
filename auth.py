@@ -16,7 +16,11 @@ Variables .env utilisées :
     BREVO_API_KEY   clé API Brevo (envoi transactionnel)
     MAIL_FROM       adresse expéditeur, vérifiée dans Brevo
     MAIL_FROM_NAME  nom affiché de l'expéditeur (facultatif)
-    COOKIE_SECURE   1 en production (HTTPS), 0 en local (http://localhost)
+    COOKIE_SECURE   1 = HTTPS seulement, 0 = http (local), auto = selon la requête
+                    (utile quand le même serveur répond en http sur le réseau
+                    local ET en https via ngrok)
+    ALLOWED_HOSTS   noms d'hôte acceptés, séparés par des virgules
+                    (ex. ba220-20:8000,xxx.ngrok-free.app) ; vide = pas de contrôle
 """
 
 import json
@@ -30,6 +34,7 @@ from datetime import timedelta
 
 from flask import (Blueprint, abort, current_app, flash, g, redirect,
                    render_template_string, request, session, url_for)
+from flask.sessions import SecureCookieSessionInterface
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 auth_bp = Blueprint("auth", __name__)
@@ -86,8 +91,14 @@ def init_auth(app):
         PERMANENT_SESSION_LIFETIME=timedelta(days=30),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "1") == "1",
     )
+    cookie_secure = os.getenv("COOKIE_SECURE", "1").strip().lower()
+    if cookie_secure == "auto":
+        app.session_interface = _AdaptiveSecureSession()
+    else:
+        app.config["SESSION_COOKIE_SECURE"] = cookie_secure == "1"
+
+    allowed_hosts = {h.strip().lower() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()}
 
     with sqlite3.connect(app.config["AUTH_DB"]) as db:
         db.executescript(SCHEMA)
@@ -105,6 +116,10 @@ def init_auth(app):
 
     @app.before_request
     def _require_login():
+        # les liens magiques sont construits à partir du nom d'hôte de la
+        # requête : on refuse tout hôte inconnu (en-tête Host falsifié)
+        if allowed_hosts and request.host.lower() not in allowed_hosts:
+            abort(400)
         g.user = None
         email = session.get("user")
         if email:
@@ -124,6 +139,12 @@ def init_auth(app):
     @app.context_processor
     def _inject_user():
         return {"current_user": g.get("user")}
+
+
+class _AdaptiveSecureSession(SecureCookieSessionInterface):
+    """Cookie « Secure » seulement quand la requête arrive en HTTPS."""
+    def get_cookie_secure(self, app):
+        return request.is_secure
 
 
 def admin_required():
